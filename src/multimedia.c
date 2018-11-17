@@ -46,6 +46,13 @@ struct buffer {
         size_t  length;
 };
 
+typedef struct crop_w {
+    int start_x;
+    int start_y;
+    int end_x;
+    int end_y;
+} crop_window;
+
 static unsigned int     n_buffers;
 
 static void errno_exit(const char *s)
@@ -123,6 +130,42 @@ int BMPwriter(unsigned char *pRGB, int bitNum, int width, int height, char* outp
     return 0; 
 }
 
+/*
+*  Function: YUYV2RGB24
+*  --------------------
+*  Converts a YUYV bitmap to a true color (i.e. 24 bit depth) RGB bitmap
+*
+*  pYUYV:  A pointer to the pixels of a YUYV bitmap in memory.
+*  width:  The width of the image.
+*  height: The height of the image.
+*  pRGB24: A pointer to memory allocated to hold the pixels of the RGB bitmap.
+*
+*  Bitmaps are stored as continuous runs of pixels in memory. In order to access
+*  a particular (x, y) pixel, you need to address it by some variation
+*  of the following formula:
+*     start_address + y*(number fo pixels in width) + x
+*
+*  The variation in the formula come down to memory access
+*  considerations (more on that later).
+*
+*  Below is a diagram of a small 4 x 4 square patch of a YUYV bitmap:
+*
+*  YUYVYUYV
+*  YUYVYUYV
+*
+*  i.e. Each pixel contains two values, either YU or YV.
+*  From https://en.wikipedia.org/wiki/YUV, we are told that Y is the
+*  luminance channel and indicates brightniss of the pixel and U and V
+*  represent the chrominance. Each value takes up a byte of space,
+*  and so each pixel takes up two bytes of space.
+*
+*  There is some formula for YUV --> RGB colorspace conversion being
+*  used here. (todo: (Xavier) Add more details).
+*
+*  RGB24 bitmaps are continuous runs of pixels stored as BGR, i.e. blue,
+*  green and red values. Each value takes up a byte of space, and so each
+*  pixel takes up three bytes of space, i.e. 24 bits.
+*/
 int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB24)
 {
     unsigned int i, j;
@@ -133,7 +176,16 @@ int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB2
     unsigned int pitch;
     unsigned int pitchRGB;
 
+    // Number of bytes in one row of pixels in the YUYV bitmap.
     pitch = 2*width;
+
+    // Number of bytes in one row of pixels in the RGB bitmap.
+    // However for memory access reasons, i.e. needing to be able
+    // to do aligned reads, this needs to be a multiple of 4.
+    // In the YUYV bitmap this is already the case.
+    // For the RGB bitmap, the number of bytes hoding each row
+    // of pixels of the image may thus be slightly larger, with
+    // some wasteage on the ends.
     pitchRGB = ALIGN_TO_FOUR(3*width);
 
 
@@ -148,18 +200,23 @@ int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB2
             int R, G, B;  
             int Y, U, V;
 
+            // YUV --> RGB colorspace conversion.
             Y = pMovY[0]; U = *pMovU - 128; V = *pMovV - 128;   
             R = Y_PLUS_RDIFF(Y, V); G = Y_PLUS_GDIFF(Y, U, V); B = Y_PLUS_BDIFF(Y, U);
 
+            // Clipping the value to the 0 - 255 range.
             *pMovRGB = CLIP1(B);
             *(pMovRGB + 1) = CLIP1(G);     
             *(pMovRGB + 2) = CLIP1(R);   
 
+            // Move the pointer to the next Y value to use.
             pMovY += 2;
 
+            // Move the U and V value pointers to the next U and V values to use.
             pMovU += 4*EVEN_ZERO_ODD_ONE(i);
             pMovV += 4*EVEN_ZERO_ODD_ONE(i);
 
+            // Move the pointer to the start of the next BGR pixel in the RGB bitmap.
             pMovRGB += 3;
         }
     }
@@ -167,20 +224,77 @@ int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB2
     return 0;
 }
 
-static void process_image(const void *p, int size, char* output_filestring)
+/*
+*  Function: cropRGB24
+*  -------------------
+*
+*  inputRGB24   Pointer to the input RGB24 bitmap bytes in memory.
+*  width        The width in pixels of the input bitmap.
+*  height       The height in pixels of the input bitmap.
+*  startX       The x-coordinate of the top left corner of the crop window.
+*  startY       The y-coordinate of the top left corner of the crop window.
+*  endX         The x-coordinate of the bottom right corner of the crop window.
+*  endY         The y-coordinate of the bottom right corner of the crop window.
+*  outputRGB24  Pointer to the start of the memory region allocated for holding
+*               the bytes of the output RGB24 bitmap.
+*/
+int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int startY, int endX, int endY, unsigned char* outputRGB24)
 {
-    unsigned char *pRGB24;
+    unsigned int i, j;
+    unsigned int pitchInputRGB, pitchOutputRGB;
+    unsigned char* pMovInputRGB;
+    unsigned char* pMovOutputRGB;
+
+    pMovInputRGB = inputRGB24;
+    pMovOutputRGB = outputRGB24;
+
+    pitchInputRGB = ALIGN_TO_FOUR(3*width);
+    pitchOutputRGB = ALIGN_TO_FOUR(3*(endX - startX));
+
+    // Iterate over all the pixels from the input RGB24 bitmap that
+    // are within the crop window, and simply copy the BGR values to
+    // the allocated memory.
+    for(j = startY; j < endY; j++) {
+        for(i = startX; i < endX; i++) {
+            // The start memory location of the (i, j)th pixel of the
+            // input RGB24 bitmap.
+            pMovInputRGB = inputRGB24 + j*pitchInputRGB + i*3;
+
+            // The start memory location of the (i, j)th pixel of the
+            // output RGB24 bitmap.
+            pMovOutputRGB = outputRGB24 + (j - startY)*pitchOutputRGB + (i - startX)*3;
+
+            // Assign the BGR values of the (i, j)th pixel of the input RGB bitmap
+            // to the BGR values of the (i, j)th pixel of the output RGB bitmap.
+            *pMovOutputRGB = *pMovInputRGB;
+            *(pMovOutputRGB + 1) = *(pMovInputRGB + 1);
+            *(pMovOutputRGB + 2) = *(pMovInputRGB + 2);
+        }
+    }
+
+    return 0;
+
+}
+
+static void process_image(const void *p, int size, char* output_filestring, char* output_cropped_filestring, crop_window c_window)
+{
+    unsigned char *pRGB24, *pCroppedRGB24;
     pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*640)*480);
+    pCroppedRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*(c_window.end_x - c_window.start_x))*(c_window.end_y - c_window.start_y));
 
     YUYV2RGB24((unsigned char *)p, 640, 480, pRGB24);
+    cropRGB24(pRGB24, 640, 480, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
+    BMPwriter(pCroppedRGB24, 24, (c_window.end_x - c_window.start_x), (c_window.end_y - c_window.start_y), output_cropped_filestring);
     BMPwriter(pRGB24, 24, 640, 480, output_filestring);
     free(pRGB24);
+    free(pCroppedRGB24);
 
     fflush(stderr);
     fprintf(stderr, ".");
 }
 
-static int read_frame(int device_handle, enum io_method io_selection, struct buffer* buffers, char* output_filestring)
+static int read_frame(int device_handle, enum io_method io_selection, struct buffer* buffers, char* output_filestring,
+                      char* output_cropped_filestring, crop_window c_window)
 {
         struct v4l2_buffer buf;
         unsigned int i;
@@ -202,7 +316,7 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
                         }
                 }
 
-                process_image(buffers[0].start, buffers[0].length, output_filestring);
+                process_image(buffers[0].start, buffers[0].length, output_filestring, output_cropped_filestring, c_window);
                 break;
 
         case IO_METHOD_MMAP:
@@ -228,7 +342,7 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
 
                 assert(buf.index < n_buffers);
 
-                process_image(buffers[buf.index].start, buf.bytesused, output_filestring);
+                process_image(buffers[buf.index].start, buf.bytesused, output_filestring, output_cropped_filestring, c_window);
 
                 if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -262,7 +376,7 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
 
                 assert(i < n_buffers);
 
-                process_image((void *)buf.m.userptr, buf.bytesused, output_filestring);
+                process_image((void *)buf.m.userptr, buf.bytesused, output_filestring, output_cropped_filestring, c_window);
 
                 if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -272,10 +386,12 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
         return 1;
 }
 
-static void mainloop(int device_handle, enum io_method io_selection, struct buffer* buffers, int frame_count, char* output_filestring)
+static void mainloop(int device_handle, enum io_method io_selection, struct buffer* buffers, int frame_count, char* output_filestring,
+                     crop_window c_window)
 {
     unsigned int count = 0;
     char output_filename[50];
+    char output_cropped_filename[50];
 
     while (count < frame_count) {
         for (;;) {
@@ -304,7 +420,8 @@ static void mainloop(int device_handle, enum io_method io_selection, struct buff
             }
 
             sprintf(output_filename, "%s-%d.bmp", output_filestring, count);
-            if (read_frame(device_handle, io_selection, buffers, output_filename))
+            sprintf(output_cropped_filename, "%s-%d-cropped.bmp", output_filestring, count);
+            if (read_frame(device_handle, io_selection, buffers, output_filename, output_cropped_filename, c_window))
                     break;
             /* EAGAIN - continue select loop. */
         }
@@ -706,11 +823,12 @@ static void usage(FILE *fp, int argc, char **argv, char* dev_name, int frame_cou
                  "-o | --output        Outputs stream to stdoutn"
                  "-f | --format        Force format to 640x480 YUYVn"
                  "-c | --count         Number of frames to grab [%i]n"
+                 "-w | --window        Crop window"
                  "",
                  argv[0], dev_name, frame_count);
 }
 
-static const char short_options[] = "d:hmruo:fc:";
+static const char short_options[] = "d:hmruo:fc:w:";
 
 static const struct option
 long_options[] = {
@@ -722,6 +840,7 @@ long_options[] = {
         { "output", required_argument, NULL, 'o' },
         { "format", no_argument,       NULL, 'f' },
         { "count",  required_argument, NULL, 'c' },
+        { "window",  required_argument, NULL, 'w' },
         { 0, 0, 0, 0 }
 };
 
@@ -733,7 +852,11 @@ int main(int argc, char **argv)
     int frame_count = 70;
     static char *dev_name = "/dev/video0";
     static char *output_filestring = "test";
+    int window_coords[4] = {100, 100, 200, 200};
+    int coord_i = 0;
+    char* window_args;
     int force_format = 0;
+    crop_window c_window;
 
     for (;;) {
         int idx;
@@ -783,6 +906,13 @@ int main(int argc, char **argv)
                 if (errno)
                         errno_exit(optarg);
                 break;
+        case 'w':
+            window_args = strtok(optarg, ",");
+            while(window_args != NULL) {
+                window_coords[coord_i++] = strtol(window_args, NULL, 0);
+                window_args = strtok(NULL, ",");
+            }
+            break;
 
         default:
                 usage(stderr, argc, argv, dev_name, frame_count);
@@ -790,11 +920,16 @@ int main(int argc, char **argv)
         }
     }
 
+    c_window.start_x = window_coords[0];
+    c_window.start_y = window_coords[1];
+    c_window.end_x = window_coords[2];
+    c_window.end_y = window_coords[3];
+
     device_handle = open_device(dev_name);
     print_formats(device_handle);
     buffers = init_device(dev_name, device_handle, io_selection, force_format);
     start_capturing(device_handle, io_selection, buffers);
-    mainloop(device_handle, io_selection, buffers, frame_count, output_filestring);
+    mainloop(device_handle, io_selection, buffers, frame_count, output_filestring, c_window);
     stop_capturing(device_handle, io_selection);
     uninit_device(io_selection, buffers);
     close_device(device_handle);
