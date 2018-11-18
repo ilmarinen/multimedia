@@ -14,6 +14,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 
+#include <math.h>
 #include <linux/videodev2.h>
 
 #define FOUR             (4) 
@@ -52,6 +53,13 @@ typedef struct crop_w {
     int end_x;
     int end_y;
 } crop_window;
+
+typedef struct tagRGBQUAD {
+  unsigned char rgbBlue;
+  unsigned char rgbGreen;
+  unsigned char rgbRed;
+  unsigned char rgbReserved;
+} RGBQUAD;
 
 static unsigned int     n_buffers;
 
@@ -245,9 +253,6 @@ int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int 
     unsigned char* pMovInputRGB;
     unsigned char* pMovOutputRGB;
 
-    pMovInputRGB = inputRGB24;
-    pMovOutputRGB = outputRGB24;
-
     pitchInputRGB = ALIGN_TO_FOUR(3*width);
     pitchOutputRGB = ALIGN_TO_FOUR(3*(endX - startX));
 
@@ -276,25 +281,151 @@ int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int 
 
 }
 
-static void process_image(const void *p, int size, char* output_filestring, char* output_cropped_filestring, crop_window c_window)
+/*
+*  Function: RGB24toGrayscale
+*  --------------------------
+*
+*  inputRGB24       Pointer to the bytes in memory holding the pixels of the RGB24 bitmap.
+*  width            Width in pixels of the input RGB24 bitmap.
+*  height           Height in pixels of the input RGB24 bitmap.
+*  outputGrayscale  Pointer to the bytes in memory which will hold the pixels of the 8-bit
+*                   grayscale bitmap.
+*
+*  This function calculates the luminance Y of each pixel of the input RGB24 bitmap, and
+*  clamps its value to the 0 - 255 range. It then assigns this value to the corresponding
+*  pixel of the output grayscale bitmap.
+*/
+int RGB24toGrayscale(unsigned char *inputRGB24, int width, int height, unsigned char *outputGrayscale)
 {
-    unsigned char *pRGB24, *pCroppedRGB24;
+    unsigned int i, j;
+    unsigned int pitchInputRGB, pitchOutputGrayscale;
+    unsigned char* pMovInputRGB;
+    unsigned char* pMovOutputGrayscale;
+
+    pitchInputRGB = ALIGN_TO_FOUR(3*width);
+    pitchOutputGrayscale = ALIGN_TO_FOUR(width);
+    pMovOutputGrayscale = outputGrayscale;
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            int R, G, B, Y;
+            pMovInputRGB = inputRGB24 + j*pitchInputRGB + i*3;
+            pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+
+            B = *pMovInputRGB;
+            G = *(pMovInputRGB + 1);
+            R = *(pMovInputRGB + 2);
+
+            Y = 0.2126 * (double)R  + 0.7152 * (double)G + 0.722 * (double)B;
+            if (Y > 255) Y = 255;
+            else if (Y < 0) Y = 0;
+
+            *pMovOutputGrayscale = (unsigned char)Y;
+        }
+    }
+
+    return 0;
+}
+
+int GrayScaleWriter(unsigned char *pGrayscale, int width, int height, char* output_filestring)
+{
+    FILE *fd_output; 
+    int fileSize;
+    const int NUMBER_OF_COLORS = 256;
+    const int COLOR_PALETTE_SIZE = NUMBER_OF_COLORS * sizeof(RGBQUAD);
+    RGBQUAD quad[NUMBER_OF_COLORS];
+    int rgb_offset = 54 + COLOR_PALETTE_SIZE;
+    unsigned char *pMovGrayscale;
+    int i, widthStep;
+
+    unsigned char header[54] = {
+        0x42,        // identity : B
+        0x4d,        // identity : M
+        0, 0, 0, 0,  // file size
+        0, 0,        // reserved1
+        0, 0,        // reserved2
+        0, 0, 0, 0, // RGB data offset
+        40, 0, 0, 0, // struct BITMAPINFOHEADER size
+        0, 0, 0, 0,  // bmp width
+        0, 0, 0, 0,  // bmp height
+        1, 0,        // planes
+        8, 0,       // bit per pixel
+        0, 0, 0, 0,  // compression
+        0, 0, 0, 0,  // data size
+        0, 0, 0, 0,  // h resolution
+        0, 0, 0, 0,  // v resolution 
+        0, 0, 0, 0,  // used colors
+        0, 0, 0, 0   // important colors
+    };
+
+    // create the color palette
+    for (i = 0; i < NUMBER_OF_COLORS; i++)
+    {
+        quad[i].rgbBlue = i;
+        quad[i].rgbGreen = i;
+        quad[i].rgbRed = i;
+        quad[i].rgbReserved = 0;
+    }
+
+    widthStep = ALIGN_TO_FOUR(width);
+
+    fileSize = ALIGN_TO_FOUR(widthStep*height) + sizeof(header);
+
+    memcpy(&header[2], &fileSize, sizeof(int));
+    memcpy(&header[10], &rgb_offset, sizeof(int));
+    memcpy(&header[18], &width, sizeof(int));
+    memcpy(&header[22], &height, sizeof(int));
+
+
+    fprintf(stdout, "writing to file...");
+
+    fd_output = fopen(output_filestring, "wb");
+
+    fwrite(&header[0], 1, sizeof(header), fd_output);
+    fwrite(quad, 1, COLOR_PALETTE_SIZE, fd_output);
+
+    pMovGrayscale  = pGrayscale + (height - 1)*widthStep; 
+
+    for(i = 0; i < height; i++){
+        fwrite(pMovGrayscale, 1, widthStep, fd_output);
+        pMovGrayscale -= widthStep;
+    }
+
+    fflush(fd_output); 
+    fclose(fd_output);
+    fprintf(stdout, "done\n"); 
+
+    return 0;
+}
+
+static void process_image(const void *p, int size, char* output_filestring, int frame_number, crop_window c_window)
+{
+    char output_filename[50], output_cropped_filename[50], output_grayscale_filename[50];
+    unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale;
     pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*640)*480);
+    pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(640)*480);
     pCroppedRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*(c_window.end_x - c_window.start_x))*(c_window.end_y - c_window.start_y));
 
+    sprintf(output_filename, "%s-%d.bmp", output_filestring, frame_number);
+    sprintf(output_cropped_filename, "%s-%d-cropped.bmp", output_filestring, frame_number);
+    sprintf(output_grayscale_filename, "%s-%d-gray.bmp", output_filestring, frame_number);
+
     YUYV2RGB24((unsigned char *)p, 640, 480, pRGB24);
+    RGB24toGrayscale(pRGB24, 640, 480, pGrayscale);
+    GrayScaleWriter(pGrayscale, 640, 480, output_grayscale_filename);
     cropRGB24(pRGB24, 640, 480, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
-    BMPwriter(pCroppedRGB24, 24, (c_window.end_x - c_window.start_x), (c_window.end_y - c_window.start_y), output_cropped_filestring);
-    BMPwriter(pRGB24, 24, 640, 480, output_filestring);
+    BMPwriter(pCroppedRGB24, 24, (c_window.end_x - c_window.start_x), (c_window.end_y - c_window.start_y), output_cropped_filename);
+    BMPwriter(pRGB24, 24, 640, 480, output_filename);
     free(pRGB24);
     free(pCroppedRGB24);
+    free(pGrayscale);
 
     fflush(stderr);
     fprintf(stderr, ".");
 }
 
-static int read_frame(int device_handle, enum io_method io_selection, struct buffer* buffers, char* output_filestring,
-                      char* output_cropped_filestring, crop_window c_window)
+static int read_frame(int device_handle, enum io_method io_selection, struct buffer* buffers,
+                      char* output_filestring, int frame_number, crop_window c_window)
 {
         struct v4l2_buffer buf;
         unsigned int i;
@@ -316,7 +447,7 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
                         }
                 }
 
-                process_image(buffers[0].start, buffers[0].length, output_filestring, output_cropped_filestring, c_window);
+                process_image(buffers[0].start, buffers[0].length, output_filestring, frame_number, c_window);
                 break;
 
         case IO_METHOD_MMAP:
@@ -342,7 +473,7 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
 
                 assert(buf.index < n_buffers);
 
-                process_image(buffers[buf.index].start, buf.bytesused, output_filestring, output_cropped_filestring, c_window);
+                process_image(buffers[buf.index].start, buf.bytesused, output_filestring, frame_number, c_window);
 
                 if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -376,7 +507,7 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
 
                 assert(i < n_buffers);
 
-                process_image((void *)buf.m.userptr, buf.bytesused, output_filestring, output_cropped_filestring, c_window);
+                process_image((void *)buf.m.userptr, buf.bytesused, output_filestring, frame_number, c_window);
 
                 if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -419,9 +550,7 @@ static void mainloop(int device_handle, enum io_method io_selection, struct buff
                     exit(EXIT_FAILURE);
             }
 
-            sprintf(output_filename, "%s-%d.bmp", output_filestring, count);
-            sprintf(output_cropped_filename, "%s-%d-cropped.bmp", output_filestring, count);
-            if (read_frame(device_handle, io_selection, buffers, output_filename, output_cropped_filename, c_window))
+            if (read_frame(device_handle, io_selection, buffers, output_filestring, count, c_window))
                     break;
             /* EAGAIN - continue select loop. */
         }
