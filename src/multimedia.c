@@ -30,8 +30,10 @@ struct buffer {
         size_t  length;
 };
 
-
-static unsigned int     n_buffers;
+typedef struct buffers_ {
+    struct buffer* buffers;
+    unsigned int n_buffers;
+} buffers;
 
 static void errno_exit(const char *s)
 {
@@ -89,7 +91,7 @@ void process_image(const void *p, int size, char* output_filestring, int frame_n
     fprintf(stderr, ".");
 }
 
-int read_frame(int device_handle, enum io_method io_selection, struct buffer* buffers,
+int read_frame(int device_handle, enum io_method io_selection, buffers buffs,
                       char* output_filestring, int frame_number, crop_window c_window)
 {
         struct v4l2_buffer buf;
@@ -97,7 +99,7 @@ int read_frame(int device_handle, enum io_method io_selection, struct buffer* bu
 
         switch (io_selection) {
         case IO_METHOD_READ:
-                if (-1 == read(device_handle, buffers[0].start, buffers[0].length)) {
+                if (-1 == read(device_handle, buffs.buffers[0].start, buffs.buffers[0].length)) {
                         switch (errno) {
                         case EAGAIN:
                                 return 0;
@@ -112,7 +114,7 @@ int read_frame(int device_handle, enum io_method io_selection, struct buffer* bu
                         }
                 }
 
-                process_image(buffers[0].start, buffers[0].length, output_filestring, frame_number, c_window);
+                process_image(buffs.buffers[0].start, buffs.buffers[0].length, output_filestring, frame_number, c_window);
                 break;
 
         case IO_METHOD_MMAP:
@@ -136,9 +138,9 @@ int read_frame(int device_handle, enum io_method io_selection, struct buffer* bu
                         }
                 }
 
-                assert(buf.index < n_buffers);
+                assert(buf.index < buffs.n_buffers);
 
-                process_image(buffers[buf.index].start, buf.bytesused, output_filestring, frame_number, c_window);
+                process_image(buffs.buffers[buf.index].start, buf.bytesused, output_filestring, frame_number, c_window);
 
                 if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -165,12 +167,12 @@ int read_frame(int device_handle, enum io_method io_selection, struct buffer* bu
                         }
                 }
 
-                for (i = 0; i < n_buffers; ++i)
-                        if (buf.m.userptr == (unsigned long)buffers[i].start
-                            && buf.length == buffers[i].length)
+                for (i = 0; i < buffs.n_buffers; ++i)
+                        if (buf.m.userptr == (unsigned long)buffs.buffers[i].start
+                            && buf.length == buffs.buffers[i].length)
                                 break;
 
-                assert(i < n_buffers);
+                assert(i < buffs.n_buffers);
 
                 process_image((void *)buf.m.userptr, buf.bytesused, output_filestring, frame_number, c_window);
 
@@ -182,7 +184,7 @@ int read_frame(int device_handle, enum io_method io_selection, struct buffer* bu
         return 1;
 }
 
-void mainloop(int device_handle, enum io_method io_selection, struct buffer* buffers, int frame_count, char* output_filestring,
+void mainloop(int device_handle, enum io_method io_selection, buffers buffs, int frame_count, char* output_filestring,
                      crop_window c_window)
 {
     unsigned int count = 0;
@@ -215,7 +217,7 @@ void mainloop(int device_handle, enum io_method io_selection, struct buffer* buf
                     exit(EXIT_FAILURE);
             }
 
-            if (read_frame(device_handle, io_selection, buffers, output_filestring, count, c_window))
+            if (read_frame(device_handle, io_selection, buffs, output_filestring, count, c_window))
                     break;
             /* EAGAIN - continue select loop. */
         }
@@ -242,7 +244,7 @@ void stop_capturing(int device_handle, enum io_method io_selection)
 
 }
 
-void start_capturing(int device_handle, enum io_method io_selection, struct buffer* buffers)
+void start_capturing(int device_handle, enum io_method io_selection, buffers buffs)
 {
     unsigned int i;
     enum v4l2_buf_type type;
@@ -253,7 +255,7 @@ void start_capturing(int device_handle, enum io_method io_selection, struct buff
         break;
 
     case IO_METHOD_MMAP:
-        for (i = 0; i < n_buffers; ++i) {
+        for (i = 0; i < buffs.n_buffers; ++i) {
             struct v4l2_buffer buf;
 
             CLEAR(buf);
@@ -270,15 +272,15 @@ void start_capturing(int device_handle, enum io_method io_selection, struct buff
         break;
 
     case IO_METHOD_USERPTR:
-        for (i = 0; i < n_buffers; ++i) {
+        for (i = 0; i < buffs.n_buffers; ++i) {
             struct v4l2_buffer buf;
 
             CLEAR(buf);
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_USERPTR;
             buf.index = i;
-            buf.m.userptr = (unsigned long)buffers[i].start;
-            buf.length = buffers[i].length;
+            buf.m.userptr = (unsigned long)buffs.buffers[i].start;
+            buf.length = buffs.buffers[i].length;
 
             if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                 errno_exit("VIDIOC_QBUF");
@@ -290,56 +292,62 @@ void start_capturing(int device_handle, enum io_method io_selection, struct buff
     }
 }
 
-void uninit_device(enum io_method io_selection, struct buffer* buffers)
+void uninit_device(enum io_method io_selection, buffers buffs)
 {
         unsigned int i;
 
         switch (io_selection) {
         case IO_METHOD_READ:
-                free(buffers[0].start);
+                free(buffs.buffers[0].start);
                 break;
 
         case IO_METHOD_MMAP:
-                for (i = 0; i < n_buffers; ++i)
-                        if (-1 == munmap(buffers[i].start, buffers[i].length))
+                for (i = 0; i < buffs.n_buffers; ++i)
+                        if (-1 == munmap(buffs.buffers[i].start, buffs.buffers[i].length))
                                 errno_exit("munmap");
                 break;
 
         case IO_METHOD_USERPTR:
-                for (i = 0; i < n_buffers; ++i)
-                        free(buffers[i].start);
+                for (i = 0; i < buffs.n_buffers; ++i)
+                        free(buffs.buffers[i].start);
                 break;
         }
 
-        free(buffers);
+        free(buffs.buffers);
 }
 
-struct buffer* init_read(unsigned int buffer_size)
+buffers init_read(unsigned int buffer_size)
 {
-    struct buffer* buffers;
+    struct buffer* pBuffers;
 
-    buffers = calloc(1, sizeof(*buffers));
+    pBuffers = calloc(1, sizeof(*pBuffers));
 
-    if (!buffers) {
+    if (!pBuffers) {
             fprintf(stderr, "Out of memory\\n");
             exit(EXIT_FAILURE);
     }
 
-    buffers[0].length = buffer_size;
-    buffers[0].start = malloc(buffer_size);
+    pBuffers[0].length = buffer_size;
+    pBuffers[0].start = malloc(buffer_size);
 
-    if (!buffers[0].start) {
+    if (!pBuffers[0].start) {
             fprintf(stderr, "Out of memory\\n");
             exit(EXIT_FAILURE);
     }
 
-    return buffers;
+    buffers bufs;
+    bufs.n_buffers = 1;
+    bufs.buffers = pBuffers;
+
+    return bufs;
 }
 
-struct buffer* init_mmap(char* dev_name, int device_handle)
+buffers init_mmap(char* dev_name, int device_handle)
 {
-    struct buffer* buffers;
+    struct buffer* pBuffers;
     struct v4l2_requestbuffers req;
+    buffers buffs;
+    unsigned int n_buffers;
 
     CLEAR(req);
 
@@ -363,9 +371,9 @@ struct buffer* init_mmap(char* dev_name, int device_handle)
             exit(EXIT_FAILURE);
     }
 
-    buffers = calloc(req.count, sizeof(*buffers));
+    pBuffers = calloc(req.count, sizeof(*pBuffers));
 
-    if (!buffers) {
+    if (!pBuffers) {
             fprintf(stderr, "Out of memory\\n");
             exit(EXIT_FAILURE);
     }
@@ -382,25 +390,30 @@ struct buffer* init_mmap(char* dev_name, int device_handle)
             if (-1 == xioctl(device_handle, VIDIOC_QUERYBUF, &buf))
                     errno_exit("VIDIOC_QUERYBUF");
 
-            buffers[n_buffers].length = buf.length;
-            buffers[n_buffers].start =
+            pBuffers[n_buffers].length = buf.length;
+            pBuffers[n_buffers].start =
                     mmap(NULL /* start anywhere */,
                           buf.length,
                           PROT_READ | PROT_WRITE /* required */,
                           MAP_SHARED /* recommended */,
                           device_handle, buf.m.offset);
 
-            if (MAP_FAILED == buffers[n_buffers].start)
+            if (MAP_FAILED == pBuffers[n_buffers].start)
                     errno_exit("mmap");
     }
 
-    return buffers;
+    buffs.buffers = pBuffers;
+    buffs.n_buffers = req.count;
+
+    return buffs;
 }
 
-struct buffer* init_userp(char* dev_name, int device_handle, unsigned int buffer_size)
+buffers init_userp(char* dev_name, int device_handle, unsigned int buffer_size)
 {
-    struct buffer* buffers;
+    struct buffer* pBuffers;
     struct v4l2_requestbuffers req;
+    buffers buffs;
+    unsigned int n_buffers;
 
     CLEAR(req);
 
@@ -418,34 +431,37 @@ struct buffer* init_userp(char* dev_name, int device_handle, unsigned int buffer
             }
     }
 
-    buffers = calloc(4, sizeof(*buffers));
+    pBuffers = calloc(4, sizeof(*pBuffers));
 
-    if (!buffers) {
+    if (!pBuffers) {
             fprintf(stderr, "Out of memory\\n");
             exit(EXIT_FAILURE);
     }
 
     for (n_buffers = 0; n_buffers < 4; ++n_buffers) {
-            buffers[n_buffers].length = buffer_size;
-            buffers[n_buffers].start = malloc(buffer_size);
+            pBuffers[n_buffers].length = buffer_size;
+            pBuffers[n_buffers].start = malloc(buffer_size);
 
-            if (!buffers[n_buffers].start) {
+            if (!pBuffers[n_buffers].start) {
                     fprintf(stderr, "Out of memory\\n");
                     exit(EXIT_FAILURE);
             }
     }
 
-    return buffers;
+    buffs.buffers = pBuffers;
+    buffs.n_buffers = 4;
+
+    return buffs;
 }
 
-struct buffer* init_device(char* dev_name, int device_handle, enum io_method io_selection, int force_format)
+buffers init_device(char* dev_name, int device_handle, enum io_method io_selection, int force_format)
 {
     struct v4l2_capability cap;
     struct v4l2_cropcap cropcap;
     struct v4l2_crop crop;
     struct v4l2_format fmt;
     unsigned int min;
-    struct buffer* buffers = NULL;
+    buffers buffs;
 
     if (-1 == xioctl(device_handle, VIDIOC_QUERYCAP, &cap)) {
         if (EINVAL == errno) {
@@ -540,19 +556,19 @@ struct buffer* init_device(char* dev_name, int device_handle, enum io_method io_
 
     switch (io_selection) {
     case IO_METHOD_READ:
-        buffers = init_read(fmt.fmt.pix.sizeimage);
+        buffs = init_read(fmt.fmt.pix.sizeimage);
         break;
 
     case IO_METHOD_MMAP:
-        buffers = init_mmap(dev_name, device_handle);
+        buffs = init_mmap(dev_name, device_handle);
         break;
 
     case IO_METHOD_USERPTR:
-        buffers = init_userp(dev_name, device_handle, fmt.fmt.pix.sizeimage);
+        buffs = init_userp(dev_name, device_handle, fmt.fmt.pix.sizeimage);
         break;
     }
 
-    return buffers;
+    return buffs;
 }
 
 void close_device(int device_handle)
@@ -642,7 +658,7 @@ int main(int argc, char **argv)
 {
     enum io_method io_selection = IO_METHOD_MMAP;
     int device_handle = -1;
-    struct buffer *buffers;
+    buffers buffs;
     int frame_count = 70;
     static char *dev_name = "/dev/video0";
     static char *output_filestring = "test";
@@ -721,11 +737,11 @@ int main(int argc, char **argv)
 
     device_handle = open_device(dev_name);
     print_formats(device_handle);
-    buffers = init_device(dev_name, device_handle, io_selection, force_format);
-    start_capturing(device_handle, io_selection, buffers);
-    mainloop(device_handle, io_selection, buffers, frame_count, output_filestring, c_window);
+    buffs = init_device(dev_name, device_handle, io_selection, force_format);
+    start_capturing(device_handle, io_selection, buffs);
+    mainloop(device_handle, io_selection, buffs, frame_count, output_filestring, c_window);
     stop_capturing(device_handle, io_selection);
-    uninit_device(io_selection, buffers);
+    uninit_device(io_selection, buffs);
     close_device(device_handle);
     fprintf(stderr, "\\n");
     return 0;
