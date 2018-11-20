@@ -3,7 +3,11 @@
 ## Build
 
 1. `mkdir build`
-2. `gcc src/multimedia.c build/multimedia` or `gcc -g3 src/multimedia.c -o build/multimedia` (so that you can use GDB and Valgrind).
+2. `gcc src/multimedia.c src/imageprocessing.c build/multimedia` or `gcc -g3 src/multimedia.c src/imageprocessing.c -o build/multimedia` (so that you can use GDB and Valgrind).
+
+## Tests
+1. `gcc src/test_imageprocessing.c src/imageprocessing.c build/test_imageprocessing`
+2. `./build/test_imageprocessing`
 
 ## Usage
 

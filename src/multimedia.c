@@ -14,26 +14,9 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 
-#include <math.h>
 #include <linux/videodev2.h>
 
-#define FOUR             (4) 
-#define ALIGN_TO_FOUR(VAL)        (((VAL) + FOUR - 1) & ~(FOUR - 1) )
-
-#define CLEAR(x) memset(&(x), 0, sizeof(x))
-
-#define R_DIFF(VV)    ( (VV) + ( 103*(VV) >> 8 ) )
-#define G_DIFF(UU, VV)   (-( (88*(UU) ) >> 8) - ( (VV*183) >> 8 )  )
-#define B_DIFF(UU)    ((UU) + ( (198*(UU) ) >>8 ) )
-
-#define Y_PLUS_RDIFF(YY, VV)   ( (YY) + R_DIFF(VV) )             
-#define Y_PLUS_GDIFF(YY, UU, VV)  ( (YY) + G_DIFF(UU, VV) )
-#define Y_PLUS_BDIFF(YY, UU)   ( (YY) + B_DIFF(UU) )
-
-#define EVEN_ZERO_ODD_ONE(XX)   ( ( (XX) & (0x01) ) )
-
-/*if X > 255, X = 255; if X< 0, X = 0*/
-#define CLIP1(XX)    ((unsigned char)( (XX & ~255) ? (~XX >> 15) : XX ))
+#include "imageprocessing.h"
 
 
 enum io_method {
@@ -47,19 +30,6 @@ struct buffer {
         size_t  length;
 };
 
-typedef struct crop_w {
-    int start_x;
-    int start_y;
-    int end_x;
-    int end_y;
-} crop_window;
-
-typedef struct tagRGBQUAD {
-  unsigned char rgbBlue;
-  unsigned char rgbGreen;
-  unsigned char rgbRed;
-  unsigned char rgbReserved;
-} RGBQUAD;
 
 static unsigned int     n_buffers;
 
@@ -69,7 +39,7 @@ static void errno_exit(const char *s)
         exit(EXIT_FAILURE);
 }
 
-static int xioctl(int fh, int request, void *arg)
+int xioctl(int fh, int request, void *arg)
 {
         int r;
 
@@ -80,351 +50,43 @@ static int xioctl(int fh, int request, void *arg)
         return r;
 }
 
-int BMPwriter(unsigned char *pRGB, int bitNum, int width, int height, char* output_filestring)
+void process_image(const void *p, int size, char* output_filestring, int frame_number, crop_window c_window)
 {
-    FILE *fd_output; 
-    int fileSize;
-    unsigned char *pMovRGB;
-    int i;
-    int widthStep;
-
-    unsigned char header[54] = {
-        0x42,        // identity : B
-        0x4d,        // identity : M
-        0, 0, 0, 0,  // file size
-        0, 0,        // reserved1
-        0, 0,        // reserved2
-        54, 0, 0, 0, // RGB data offset
-        40, 0, 0, 0, // struct BITMAPINFOHEADER size
-        0, 0, 0, 0,  // bmp width
-        0, 0, 0, 0,  // bmp height
-        1, 0,        // planes
-        24, 0,       // bit per pixel
-        0, 0, 0, 0,  // compression
-        0, 0, 0, 0,  // data size
-        0, 0, 0, 0,  // h resolution
-        0, 0, 0, 0,  // v resolution 
-        0, 0, 0, 0,  // used colors
-        0, 0, 0, 0   // important colors
-    };
-
-    widthStep = ALIGN_TO_FOUR(width*bitNum/8);
-
-    fileSize = ALIGN_TO_FOUR(widthStep*height) + sizeof(header);
-
-    memcpy(&header[2], &fileSize, sizeof(int));
-    memcpy(&header[18], &width, sizeof(int));
-    memcpy(&header[22], &height, sizeof(int));
-    memcpy(&header[28], &bitNum, sizeof(short)); 
-
-
-    fprintf(stdout, "writing to file...");
-
-    fd_output = fopen(output_filestring, "wb");
-
-    fwrite(&header[0], 1, sizeof(header), fd_output);  
-
-    pMovRGB  = pRGB + (height - 1)*widthStep; 
-
-    for(i = 0; i < height; i++){
-        fwrite(pMovRGB, 1, widthStep, fd_output);
-        pMovRGB -= widthStep;
-    }
-
-    fflush(fd_output); 
-    fclose(fd_output);
-    fprintf(stdout, "done\n"); 
-
-    return 0; 
-}
-
-/*
-*  Function: YUYV2RGB24
-*  --------------------
-*  Converts a YUYV bitmap to a true color (i.e. 24 bit depth) RGB bitmap
-*
-*  pYUYV:  A pointer to the pixels of a YUYV bitmap in memory.
-*  width:  The width of the image.
-*  height: The height of the image.
-*  pRGB24: A pointer to memory allocated to hold the pixels of the RGB bitmap.
-*
-*  Bitmaps are stored as continuous runs of pixels in memory. In order to access
-*  a particular (x, y) pixel, you need to address it by some variation
-*  of the following formula:
-*     start_address + y*(number fo pixels in width) + x
-*
-*  The variation in the formula come down to memory access
-*  considerations (more on that later).
-*
-*  Below is a diagram of a small 4 x 4 square patch of a YUYV bitmap:
-*
-*  YUYVYUYV
-*  YUYVYUYV
-*
-*  i.e. Each pixel contains two values, either YU or YV.
-*  From https://en.wikipedia.org/wiki/YUV, we are told that Y is the
-*  luminance channel and indicates brightniss of the pixel and U and V
-*  represent the chrominance. Each value takes up a byte of space,
-*  and so each pixel takes up two bytes of space.
-*
-*  There is some formula for YUV --> RGB colorspace conversion being
-*  used here. (todo: (Xavier) Add more details).
-*
-*  RGB24 bitmaps are continuous runs of pixels stored as BGR, i.e. blue,
-*  green and red values. Each value takes up a byte of space, and so each
-*  pixel takes up three bytes of space, i.e. 24 bits.
-*/
-int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB24)
-{
-    unsigned int i, j;
-
-    unsigned char *pMovY, *pMovU, *pMovV;
-    unsigned char *pMovRGB;
-
-    unsigned int pitch;
-    unsigned int pitchRGB;
-
-    // Number of bytes in one row of pixels in the YUYV bitmap.
-    pitch = 2*width;
-
-    // Number of bytes in one row of pixels in the RGB bitmap.
-    // However for memory access reasons, i.e. needing to be able
-    // to do aligned reads, this needs to be a multiple of 4.
-    // In the YUYV bitmap this is already the case.
-    // For the RGB bitmap, the number of bytes hoding each row
-    // of pixels of the image may thus be slightly larger, with
-    // some wasteage on the ends.
-    pitchRGB = ALIGN_TO_FOUR(3*width);
-
-
-    for(j = 0; j< height; j++){
-        pMovY = pYUYV + j*pitch;
-        pMovU = pMovY + 1; 
-        pMovV = pMovY + 3; 
-
-        pMovRGB = pRGB24 + pitchRGB*j;
-
-        for(i = 0; i< width; i++){
-            int R, G, B;  
-            int Y, U, V;
-
-            // YUV --> RGB colorspace conversion.
-            Y = pMovY[0]; U = *pMovU - 128; V = *pMovV - 128;   
-            R = Y_PLUS_RDIFF(Y, V); G = Y_PLUS_GDIFF(Y, U, V); B = Y_PLUS_BDIFF(Y, U);
-
-            // Clipping the value to the 0 - 255 range.
-            *pMovRGB = CLIP1(B);
-            *(pMovRGB + 1) = CLIP1(G);     
-            *(pMovRGB + 2) = CLIP1(R);   
-
-            // Move the pointer to the next Y value to use.
-            pMovY += 2;
-
-            // Move the U and V value pointers to the next U and V values to use.
-            pMovU += 4*EVEN_ZERO_ODD_ONE(i);
-            pMovV += 4*EVEN_ZERO_ODD_ONE(i);
-
-            // Move the pointer to the start of the next BGR pixel in the RGB bitmap.
-            pMovRGB += 3;
-        }
-    }
-
-    return 0;
-}
-
-/*
-*  Function: cropRGB24
-*  -------------------
-*
-*  inputRGB24   Pointer to the input RGB24 bitmap bytes in memory.
-*  width        The width in pixels of the input bitmap.
-*  height       The height in pixels of the input bitmap.
-*  startX       The x-coordinate of the top left corner of the crop window.
-*  startY       The y-coordinate of the top left corner of the crop window.
-*  endX         The x-coordinate of the bottom right corner of the crop window.
-*  endY         The y-coordinate of the bottom right corner of the crop window.
-*  outputRGB24  Pointer to the start of the memory region allocated for holding
-*               the bytes of the output RGB24 bitmap.
-*/
-int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int startY, int endX, int endY, unsigned char* outputRGB24)
-{
-    unsigned int i, j;
-    unsigned int pitchInputRGB, pitchOutputRGB;
-    unsigned char* pMovInputRGB;
-    unsigned char* pMovOutputRGB;
-
-    pitchInputRGB = ALIGN_TO_FOUR(3*width);
-    pitchOutputRGB = ALIGN_TO_FOUR(3*(endX - startX));
-
-    // Iterate over all the pixels from the input RGB24 bitmap that
-    // are within the crop window, and simply copy the BGR values to
-    // the allocated memory.
-    for(j = startY; j < endY; j++) {
-        for(i = startX; i < endX; i++) {
-            // The start memory location of the (i, j)th pixel of the
-            // input RGB24 bitmap.
-            pMovInputRGB = inputRGB24 + j*pitchInputRGB + i*3;
-
-            // The start memory location of the (i, j)th pixel of the
-            // output RGB24 bitmap.
-            pMovOutputRGB = outputRGB24 + (j - startY)*pitchOutputRGB + (i - startX)*3;
-
-            // Assign the BGR values of the (i, j)th pixel of the input RGB bitmap
-            // to the BGR values of the (i, j)th pixel of the output RGB bitmap.
-            *pMovOutputRGB = *pMovInputRGB;
-            *(pMovOutputRGB + 1) = *(pMovInputRGB + 1);
-            *(pMovOutputRGB + 2) = *(pMovInputRGB + 2);
-        }
-    }
-
-    return 0;
-
-}
-
-/*
-*  Function: RGB24toGrayscale
-*  --------------------------
-*
-*  inputRGB24       Pointer to the bytes in memory holding the pixels of the RGB24 bitmap.
-*  width            Width in pixels of the input RGB24 bitmap.
-*  height           Height in pixels of the input RGB24 bitmap.
-*  outputGrayscale  Pointer to the bytes in memory which will hold the pixels of the 8-bit
-*                   grayscale bitmap.
-*
-*  This function calculates the luminance Y of each pixel of the input RGB24 bitmap, and
-*  clamps its value to the 0 - 255 range. It then assigns this value to the corresponding
-*  pixel of the output grayscale bitmap.
-*/
-int RGB24toGrayscale(unsigned char *inputRGB24, int width, int height, unsigned char *outputGrayscale)
-{
-    unsigned int i, j;
-    unsigned int pitchInputRGB, pitchOutputGrayscale;
-    unsigned char* pMovInputRGB;
-    unsigned char* pMovOutputGrayscale;
-
-    pitchInputRGB = ALIGN_TO_FOUR(3*width);
-    pitchOutputGrayscale = ALIGN_TO_FOUR(width);
-    pMovOutputGrayscale = outputGrayscale;
-
-    for(j=0; j < height; j++) {
-        for(i=0; i < width; i++) {
-            int R, G, B, Y;
-            pMovInputRGB = inputRGB24 + j*pitchInputRGB + i*3;
-            pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-
-            B = *pMovInputRGB;
-            G = *(pMovInputRGB + 1);
-            R = *(pMovInputRGB + 2);
-
-            Y = 0.2126 * (double)R  + 0.7152 * (double)G + 0.722 * (double)B;
-            if (Y > 255) Y = 255;
-            else if (Y < 0) Y = 0;
-
-            *pMovOutputGrayscale = (unsigned char)Y;
-        }
-    }
-
-    return 0;
-}
-
-int GrayScaleWriter(unsigned char *pGrayscale, int width, int height, char* output_filestring)
-{
-    FILE *fd_output; 
-    int fileSize;
-    const int NUMBER_OF_COLORS = 256;
-    const int COLOR_PALETTE_SIZE = NUMBER_OF_COLORS * sizeof(RGBQUAD);
-    RGBQUAD quad[NUMBER_OF_COLORS];
-    int rgb_offset = 54 + COLOR_PALETTE_SIZE;
-    unsigned char *pMovGrayscale;
-    int i, widthStep;
-
-    unsigned char header[54] = {
-        0x42,        // identity : B
-        0x4d,        // identity : M
-        0, 0, 0, 0,  // file size
-        0, 0,        // reserved1
-        0, 0,        // reserved2
-        0, 0, 0, 0, // RGB data offset
-        40, 0, 0, 0, // struct BITMAPINFOHEADER size
-        0, 0, 0, 0,  // bmp width
-        0, 0, 0, 0,  // bmp height
-        1, 0,        // planes
-        8, 0,       // bit per pixel
-        0, 0, 0, 0,  // compression
-        0, 0, 0, 0,  // data size
-        0, 0, 0, 0,  // h resolution
-        0, 0, 0, 0,  // v resolution 
-        0, 0, 0, 0,  // used colors
-        0, 0, 0, 0   // important colors
-    };
-
-    // create the color palette
-    for (i = 0; i < NUMBER_OF_COLORS; i++)
-    {
-        quad[i].rgbBlue = i;
-        quad[i].rgbGreen = i;
-        quad[i].rgbRed = i;
-        quad[i].rgbReserved = 0;
-    }
-
-    widthStep = ALIGN_TO_FOUR(width);
-
-    fileSize = ALIGN_TO_FOUR(widthStep*height) + sizeof(header);
-
-    memcpy(&header[2], &fileSize, sizeof(int));
-    memcpy(&header[10], &rgb_offset, sizeof(int));
-    memcpy(&header[18], &width, sizeof(int));
-    memcpy(&header[22], &height, sizeof(int));
-
-
-    fprintf(stdout, "writing to file...");
-
-    fd_output = fopen(output_filestring, "wb");
-
-    fwrite(&header[0], 1, sizeof(header), fd_output);
-    fwrite(quad, 1, COLOR_PALETTE_SIZE, fd_output);
-
-    pMovGrayscale  = pGrayscale + (height - 1)*widthStep; 
-
-    for(i = 0; i < height; i++){
-        fwrite(pMovGrayscale, 1, widthStep, fd_output);
-        pMovGrayscale -= widthStep;
-    }
-
-    fflush(fd_output); 
-    fclose(fd_output);
-    fprintf(stdout, "done\n"); 
-
-    return 0;
-}
-
-static void process_image(const void *p, int size, char* output_filestring, int frame_number, crop_window c_window)
-{
-    char output_filename[50], output_cropped_filename[50], output_grayscale_filename[50];
-    unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale;
+    char output_filename[50], output_cropped_filename[50], output_grayscale_filename[50], output_grayscale_padded_filename[50];
+    unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale, *pGrayscalePadded, *pGrayscaleBlurred;
     pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*640)*480);
     pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(640)*480);
+    pGrayscalePadded = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(640 + 2*1)*482));
+    pGrayscaleBlurred = (unsigned char*)malloc(ALIGN_TO_FOUR(640)*480);
     pCroppedRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*(c_window.end_x - c_window.start_x))*(c_window.end_y - c_window.start_y));
 
     sprintf(output_filename, "%s-%d.bmp", output_filestring, frame_number);
     sprintf(output_cropped_filename, "%s-%d-cropped.bmp", output_filestring, frame_number);
     sprintf(output_grayscale_filename, "%s-%d-gray.bmp", output_filestring, frame_number);
+    sprintf(output_grayscale_padded_filename, "%s-%d-gray-padded.bmp", output_filestring, frame_number);
 
     YUYV2RGB24((unsigned char *)p, 640, 480, pRGB24);
     RGB24toGrayscale(pRGB24, 640, 480, pGrayscale);
+    makeZeroPaddedImage(pGrayscale, 640, 480, 1, pGrayscalePadded);
+    GaussianBlur(pGrayscale, 640, 480, pGrayscaleBlurred);
+
     GrayScaleWriter(pGrayscale, 640, 480, output_grayscale_filename);
+    GrayScaleWriter(pGrayscalePadded, 642, 482, output_grayscale_padded_filename);
+    GrayScaleWriter(pGrayscaleBlurred, 640, 480, "blurred.bmp");
     cropRGB24(pRGB24, 640, 480, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
     BMPwriter(pCroppedRGB24, 24, (c_window.end_x - c_window.start_x), (c_window.end_y - c_window.start_y), output_cropped_filename);
     BMPwriter(pRGB24, 24, 640, 480, output_filename);
     free(pRGB24);
     free(pCroppedRGB24);
     free(pGrayscale);
+    free(pGrayscalePadded);
+    free(pGrayscaleBlurred);
 
     fflush(stderr);
     fprintf(stderr, ".");
 }
 
-static int read_frame(int device_handle, enum io_method io_selection, struct buffer* buffers,
+int read_frame(int device_handle, enum io_method io_selection, struct buffer* buffers,
                       char* output_filestring, int frame_number, crop_window c_window)
 {
         struct v4l2_buffer buf;
@@ -517,7 +179,7 @@ static int read_frame(int device_handle, enum io_method io_selection, struct buf
         return 1;
 }
 
-static void mainloop(int device_handle, enum io_method io_selection, struct buffer* buffers, int frame_count, char* output_filestring,
+void mainloop(int device_handle, enum io_method io_selection, struct buffer* buffers, int frame_count, char* output_filestring,
                      crop_window c_window)
 {
     unsigned int count = 0;
@@ -558,7 +220,7 @@ static void mainloop(int device_handle, enum io_method io_selection, struct buff
     }
 }
 
-static void stop_capturing(int device_handle, enum io_method io_selection)
+void stop_capturing(int device_handle, enum io_method io_selection)
 {
         enum v4l2_buf_type type;
 
@@ -577,7 +239,7 @@ static void stop_capturing(int device_handle, enum io_method io_selection)
 
 }
 
-static void start_capturing(int device_handle, enum io_method io_selection, struct buffer* buffers)
+void start_capturing(int device_handle, enum io_method io_selection, struct buffer* buffers)
 {
     unsigned int i;
     enum v4l2_buf_type type;
@@ -625,7 +287,7 @@ static void start_capturing(int device_handle, enum io_method io_selection, stru
     }
 }
 
-static void uninit_device(enum io_method io_selection, struct buffer* buffers)
+void uninit_device(enum io_method io_selection, struct buffer* buffers)
 {
         unsigned int i;
 
@@ -890,7 +552,7 @@ struct buffer* init_device(char* dev_name, int device_handle, enum io_method io_
     return buffers;
 }
 
-static void close_device(int device_handle)
+void close_device(int device_handle)
 {
     if (-1 == close(device_handle))
         errno_exit("close");
@@ -898,7 +560,7 @@ static void close_device(int device_handle)
     device_handle = -1;
 }
 
-static void print_formats(int device_handle)
+void print_formats(int device_handle)
 {
     struct v4l2_fmtdesc fmtdesc;
     CLEAR(fmtdesc);
@@ -911,7 +573,7 @@ static void print_formats(int device_handle)
     }
 };
 
-static int open_device(char *device_name)
+int open_device(char *device_name)
 {
     struct stat st;
     int device_handle = -1;
@@ -938,7 +600,7 @@ static int open_device(char *device_name)
     return device_handle;
 }
 
-static void usage(FILE *fp, int argc, char **argv, char* dev_name, int frame_count)
+void usage(FILE *fp, int argc, char **argv, char* dev_name, int frame_count)
 {
         fprintf(fp,
                  "Usage: %s [options]\\n\\n"
