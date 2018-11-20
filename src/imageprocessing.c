@@ -94,12 +94,12 @@ int GrayScaleWriter(unsigned char *pGrayscale, int width, int height, char* outp
         0, 0, 0, 0,  // file size
         0, 0,        // reserved1
         0, 0,        // reserved2
-        0, 0, 0, 0, // RGB data offset
+        0, 0, 0, 0,  // RGB data offset
         40, 0, 0, 0, // struct BITMAPINFOHEADER size
         0, 0, 0, 0,  // bmp width
         0, 0, 0, 0,  // bmp height
         1, 0,        // planes
-        8, 0,       // bit per pixel
+        8, 0,        // bit per pixel
         0, 0, 0, 0,  // compression
         0, 0, 0, 0,  // data size
         0, 0, 0, 0,  // h resolution
@@ -279,6 +279,14 @@ int RGB24toGrayscale(unsigned char *inputRGB24, int width, int height, unsigned 
             G = *(pMovInputRGB + 1);
             R = *(pMovInputRGB + 2);
 
+            // The luminance Y is calculated from the R, G, B values.
+            // These values were taken from this Stackoverflow here:
+            // https://stackoverflow.com/questions/687261/converting-rgb-to-grayscale-intensity
+            // When I applied the gamma crrection, the entire grayscale
+            // image came out white. And when I didn't apply the gamma
+            // correction, I got a grayscale looking image.
+            // Additionally, check out this reference here:
+            // http://cadik.posvete.cz/color_to_gray_evaluation/
             Y = 0.2126 * (double)R  + 0.7152 * (double)G + 0.722 * (double)B;
             if (Y > 255) Y = 255;
             else if (Y < 0) Y = 0;
@@ -363,28 +371,28 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
     for(j=0; j < padWidth; j++) {
         for(i=0; i < (inputWidth + 2*padWidth); i++) {
             pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)255;
+            *pMovOutputGrayscale = (unsigned char)0;
         }
     }
 
     for(j=(padWidth + inputHeight); j < (inputHeight + 2*padWidth); j++) {
         for(i=0; i < (inputWidth + 2*padWidth); i++) {
             pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)255;
+            *pMovOutputGrayscale = (unsigned char)0;
         }
     }
 
     for(j=0; j < (2*padWidth + inputHeight); j++) {
         for(i=0; i < padWidth; i++) {
             pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)255;
+            *pMovOutputGrayscale = (unsigned char)0;
         }
     }
 
     for(j=0; j < (2*padWidth + inputHeight); j++) {
         for(i=(padWidth + inputWidth); i < (inputWidth + 2*padWidth); i++) {
             pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)255;
+            *pMovOutputGrayscale = (unsigned char)0;
         }
     }
 
@@ -419,8 +427,8 @@ int convolve2D(unsigned char* kernel, int kernelSize, unsigned char* inputGraysc
             result = 0;
             for(k=0; k < kernelSize; k++) {
                 for(l=0; l < kernelSize; l++) {
-                    pMovKernel = kernel + k*kernelSize + l;
-                    pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*kernelSize + (i - padWidth + l);
+                    pMovKernel = kernel + (kernelSize - k - 1)*kernelSize + (kernelSize - l - 1);
+                    pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*pitchPaddedGrayscale + (i - padWidth + l);
                     result = result + (*pMovKernel) * (*pMovPaddedGrayscale);
                 }
             }

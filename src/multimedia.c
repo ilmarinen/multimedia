@@ -52,7 +52,9 @@ int xioctl(int fh, int request, void *arg)
 
 void process_image(const void *p, int size, char* output_filestring, int frame_number, crop_window c_window)
 {
-    char output_filename[50], output_cropped_filename[50], output_grayscale_filename[50], output_grayscale_padded_filename[50];
+    char output_filename[50], output_cropped_filename[50],
+         output_grayscale_filename[50], output_grayscale_padded_filename[50],
+         output_blurred_filename[50];
     unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale, *pGrayscalePadded, *pGrayscaleBlurred;
     pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*640)*480);
     pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(640)*480);
@@ -64,6 +66,7 @@ void process_image(const void *p, int size, char* output_filestring, int frame_n
     sprintf(output_cropped_filename, "%s-%d-cropped.bmp", output_filestring, frame_number);
     sprintf(output_grayscale_filename, "%s-%d-gray.bmp", output_filestring, frame_number);
     sprintf(output_grayscale_padded_filename, "%s-%d-gray-padded.bmp", output_filestring, frame_number);
+    sprintf(output_blurred_filename, "%s-%d-gray-blurred.bmp", output_filestring, frame_number);
 
     YUYV2RGB24((unsigned char *)p, 640, 480, pRGB24);
     RGB24toGrayscale(pRGB24, 640, 480, pGrayscale);
@@ -72,7 +75,7 @@ void process_image(const void *p, int size, char* output_filestring, int frame_n
 
     GrayScaleWriter(pGrayscale, 640, 480, output_grayscale_filename);
     GrayScaleWriter(pGrayscalePadded, 642, 482, output_grayscale_padded_filename);
-    GrayScaleWriter(pGrayscaleBlurred, 640, 480, "blurred.bmp");
+    GrayScaleWriter(pGrayscaleBlurred, 640, 480, output_blurred_filename);
     cropRGB24(pRGB24, 640, 480, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
     BMPwriter(pCroppedRGB24, 24, (c_window.end_x - c_window.start_x), (c_window.end_y - c_window.start_y), output_cropped_filename);
     BMPwriter(pRGB24, 24, 640, 480, output_filename);
