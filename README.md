@@ -1,9 +1,15 @@
 # Linux Multimedia
 
+## Environment
+
+1. `python3 -m venv /path/to/new/virtual/environment`
+2. `source /path/to/new/virtual/environment/bin/activate`
+3. `pip install cython`
+
 ## Build
 
 1. `mkdir build`
-2. `gcc src/multimedia.c src/imageprocessing.c build/multimedia` or `gcc -g3 src/multimedia.c src/imageprocessing.c -o build/multimedia` (so that you can use GDB and Valgrind).
+2. `gcc src/multimedia.c src/imageprocessing.c src/camera.c -o build/multimedia -lm` or `gcc -g3 src/multimedia.c src/imageprocessing.c src/camera.c -o build/multimedia -lm` (so that you can use GDB and Valgrind).
 
 ## Tests
 1. `gcc src/test_imageprocessing.c src/imageprocessing.c build/test_imageprocessing`
