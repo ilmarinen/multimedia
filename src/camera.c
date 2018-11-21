@@ -189,8 +189,6 @@ void mainloop(int device_handle, enum io_method io_selection, buffers buffs, int
                      crop_window c_window)
 {
     unsigned int count = 0;
-    char output_filename[50];
-    char output_cropped_filename[50];
 
     while (count < frame_count) {
         for (;;) {
