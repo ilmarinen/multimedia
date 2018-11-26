@@ -20,22 +20,6 @@
 #include "camera.h"
 
 
-// enum io_method {
-//         IO_METHOD_READ,
-//         IO_METHOD_MMAP,
-//         IO_METHOD_USERPTR,
-// };
-
-// struct buffer {
-//         void   *start;
-//         size_t  length;
-// };
-
-// typedef struct buffers_ {
-//     struct buffer* buffers;
-//     unsigned int n_buffers;
-// } buffers;
-
 void errno_exit(const char *s)
 {
         fprintf(stderr, "%s error %d, %s\\n", s, errno, strerror(errno));
@@ -53,16 +37,17 @@ int xioctl(int fh, int request, void *arg)
         return r;
 }
 
-void process_image(const void *p, int size, char* output_filestring, int frame_number, crop_window c_window)
+void process_image(const void *p, int size, unsigned int width, unsigned int height, char* output_filestring,
+                   int frame_number, crop_window c_window)
 {
     char output_filename[50], output_cropped_filename[50],
          output_grayscale_filename[50], output_grayscale_padded_filename[50],
          output_blurred_filename[50];
     unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale, *pGrayscalePadded, *pGrayscaleBlurred;
-    pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*640)*480);
-    pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(640)*480);
-    pGrayscalePadded = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(640 + 2*1)*482));
-    pGrayscaleBlurred = (unsigned char*)malloc(ALIGN_TO_FOUR(640)*480);
+    pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*width)*height);
+    pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
+    pGrayscalePadded = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*1)*482));
+    pGrayscaleBlurred = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pCroppedRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*(c_window.end_x - c_window.start_x))*(c_window.end_y - c_window.start_y));
 
     sprintf(output_filename, "%s-%d.bmp", output_filestring, frame_number);
@@ -71,17 +56,17 @@ void process_image(const void *p, int size, char* output_filestring, int frame_n
     sprintf(output_grayscale_padded_filename, "%s-%d-gray-padded.bmp", output_filestring, frame_number);
     sprintf(output_blurred_filename, "%s-%d-gray-blurred.bmp", output_filestring, frame_number);
 
-    YUYV2RGB24((unsigned char *)p, 640, 480, pRGB24);
-    RGB24toGrayscale(pRGB24, 640, 480, pGrayscale);
-    makeZeroPaddedImage(pGrayscale, 640, 480, 1, pGrayscalePadded);
-    GaussianBlur(pGrayscale, 640, 480, pGrayscaleBlurred);
+    YUYV2RGB24((unsigned char *)p, width, height, pRGB24);
+    RGB24toGrayscale(pRGB24, width, height, pGrayscale);
+    makeZeroPaddedImage(pGrayscale, width, height, 1, pGrayscalePadded);
+    GaussianBlur(pGrayscale, width, height, pGrayscaleBlurred);
 
-    GrayScaleWriter(pGrayscale, 640, 480, output_grayscale_filename);
-    GrayScaleWriter(pGrayscalePadded, 642, 482, output_grayscale_padded_filename);
-    GrayScaleWriter(pGrayscaleBlurred, 640, 480, output_blurred_filename);
-    cropRGB24(pRGB24, 640, 480, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
+    GrayScaleWriter(pGrayscale, width, height, output_grayscale_filename);
+    GrayScaleWriter(pGrayscalePadded, (width + 2), (height + 2), output_grayscale_padded_filename);
+    GrayScaleWriter(pGrayscaleBlurred, width, height, output_blurred_filename);
+    cropRGB24(pRGB24, width, height, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
     BMPwriter(pCroppedRGB24, 24, (c_window.end_x - c_window.start_x), (c_window.end_y - c_window.start_y), output_cropped_filename);
-    BMPwriter(pRGB24, 24, 640, 480, output_filename);
+    BMPwriter(pRGB24, 24, width, height, output_filename);
     free(pRGB24);
     free(pCroppedRGB24);
     free(pGrayscale);
@@ -92,13 +77,13 @@ void process_image(const void *p, int size, char* output_filestring, int frame_n
     fprintf(stderr, ".");
 }
 
-int read_frame(int device_handle, enum io_method io_selection, buffers buffs,
+int read_frame(int device_handle, buffers buffs,
                       char* output_filestring, int frame_number, crop_window c_window)
 {
         struct v4l2_buffer buf;
         unsigned int i;
 
-        switch (io_selection) {
+        switch (buffs.io_selection) {
         case IO_METHOD_READ:
                 if (-1 == read(device_handle, buffs.buffers[0].start, buffs.buffers[0].length)) {
                         switch (errno) {
@@ -115,7 +100,8 @@ int read_frame(int device_handle, enum io_method io_selection, buffers buffs,
                         }
                 }
 
-                process_image(buffs.buffers[0].start, buffs.buffers[0].length, output_filestring, frame_number, c_window);
+                process_image(buffs.buffers[0].start, buffs.buffers[0].length, buffs.image_width, buffs.image_height,
+                              output_filestring, frame_number, c_window);
                 break;
 
         case IO_METHOD_MMAP:
@@ -141,7 +127,8 @@ int read_frame(int device_handle, enum io_method io_selection, buffers buffs,
 
                 assert(buf.index < buffs.n_buffers);
 
-                process_image(buffs.buffers[buf.index].start, buf.bytesused, output_filestring, frame_number, c_window);
+                process_image(buffs.buffers[buf.index].start, buf.bytesused, buffs.image_width, buffs.image_height,
+                              output_filestring, frame_number, c_window);
 
                 if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -175,7 +162,8 @@ int read_frame(int device_handle, enum io_method io_selection, buffers buffs,
 
                 assert(i < buffs.n_buffers);
 
-                process_image((void *)buf.m.userptr, buf.bytesused, output_filestring, frame_number, c_window);
+                process_image((void *)buf.m.userptr, buf.bytesused, buffs.image_width, buffs.image_height,
+                              output_filestring, frame_number, c_window);
 
                 if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -185,7 +173,7 @@ int read_frame(int device_handle, enum io_method io_selection, buffers buffs,
         return 1;
 }
 
-void mainloop(int device_handle, enum io_method io_selection, buffers buffs, int frame_count, char* output_filestring,
+void mainloop(int device_handle, buffers buffs, int frame_count, char* output_filestring,
                      crop_window c_window)
 {
     unsigned int count = 0;
@@ -216,7 +204,7 @@ void mainloop(int device_handle, enum io_method io_selection, buffers buffs, int
                     exit(EXIT_FAILURE);
             }
 
-            if (read_frame(device_handle, io_selection, buffs, output_filestring, count, c_window))
+            if (read_frame(device_handle, buffs, output_filestring, count, c_window))
                     break;
             /* EAGAIN - continue select loop. */
         }
@@ -224,11 +212,11 @@ void mainloop(int device_handle, enum io_method io_selection, buffers buffs, int
     }
 }
 
-void stop_capturing(int device_handle, enum io_method io_selection)
+void stop_capturing(int device_handle, buffers buffs)
 {
         enum v4l2_buf_type type;
 
-        switch (io_selection) {
+        switch (buffs.io_selection) {
         case IO_METHOD_READ:
                 /* Nothing to do. */
                 break;
@@ -243,12 +231,12 @@ void stop_capturing(int device_handle, enum io_method io_selection)
 
 }
 
-void start_capturing(int device_handle, enum io_method io_selection, buffers buffs)
+void start_capturing(int device_handle, buffers buffs)
 {
     unsigned int i;
     enum v4l2_buf_type type;
 
-    switch (io_selection) {
+    switch (buffs.io_selection) {
     case IO_METHOD_READ:
         /* Nothing to do. */
         break;
@@ -291,11 +279,11 @@ void start_capturing(int device_handle, enum io_method io_selection, buffers buf
     }
 }
 
-void uninit_device(enum io_method io_selection, buffers buffs)
+void uninit_device(buffers buffs)
 {
         unsigned int i;
 
-        switch (io_selection) {
+        switch (buffs.io_selection) {
         case IO_METHOD_READ:
                 free(buffs.buffers[0].start);
                 break;
@@ -335,6 +323,7 @@ buffers init_read(unsigned int buffer_size)
     }
 
     buffers bufs;
+    bufs.io_selection = IO_METHOD_READ;
     bufs.n_buffers = 1;
     bufs.buffers = pBuffers;
 
@@ -401,6 +390,7 @@ buffers init_mmap(char* dev_name, int device_handle)
                     errno_exit("mmap");
     }
 
+    buffs.io_selection = IO_METHOD_MMAP;
     buffs.buffers = pBuffers;
     buffs.n_buffers = req.count;
 
@@ -447,6 +437,7 @@ buffers init_userp(char* dev_name, int device_handle, unsigned int buffer_size)
             }
     }
 
+    buffs.io_selection = IO_METHOD_USERPTR;
     buffs.buffers = pBuffers;
     buffs.n_buffers = 4;
 
@@ -536,7 +527,6 @@ buffers init_device(char* dev_name, int device_handle, enum io_method io_selecti
         if (-1 == xioctl(device_handle, VIDIOC_S_FMT, &fmt))
             errno_exit("VIDIOC_S_FMT");
         fprintf(stdout, "Force format.\n");
-        fprintf(stdout, "Format: %d\n", fmt.fmt.pix.pixelformat);
 
         /* Note VIDIOC_S_FMT may change width and height. */
     } else {
@@ -553,6 +543,8 @@ buffers init_device(char* dev_name, int device_handle, enum io_method io_selecti
     if (fmt.fmt.pix.sizeimage < min)
         fmt.fmt.pix.sizeimage = min;
 
+    fprintf(stdout, "Resolution: %dx%d\n", fmt.fmt.pix.width, fmt.fmt.pix.height);
+
     switch (io_selection) {
     case IO_METHOD_READ:
         buffs = init_read(fmt.fmt.pix.sizeimage);
@@ -566,6 +558,9 @@ buffers init_device(char* dev_name, int device_handle, enum io_method io_selecti
         buffs = init_userp(dev_name, device_handle, fmt.fmt.pix.sizeimage);
         break;
     }
+
+    buffs.image_width = fmt.fmt.pix.width;
+    buffs.image_height = fmt.fmt.pix.height;
 
     return buffs;
 }

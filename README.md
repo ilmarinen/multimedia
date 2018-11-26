@@ -5,6 +5,7 @@
 1. `python3 -m venv /path/to/new/virtual/environment`
 2. `source /path/to/new/virtual/environment/bin/activate`
 3. `pip install cython`
+4. `sudo apt-get install libpython3.6-dev`
 
 ## Build
 
@@ -12,8 +13,7 @@
 2. `make`
 
 ## Tests
-1. `gcc src/test_imageprocessing.c src/imageprocessing.c build/test_imageprocessing`
-2. `./build/test_imageprocessing`
+1. `make test`
 
 ## Usage
 
@@ -94,3 +94,39 @@ be accessed from within Python.
 All the information needed for compiling the dynamic library `so` file is specified
 within the modules `setup.py` file.
 
+### Building C / C++ extensions for Python
+
+An excellent resource on this is [here](https://docs.python.org/2/extending/building.html)
+The TLDR is as follows:
+
+If the following script is in `stup.py`
+
+
+```
+from distutils.core import setup, Extension
+
+module1 = Extension('demo',
+                    define_macros = [('MAJOR_VERSION', '1'),
+                                     ('MINOR_VERSION', '0')],
+                    include_dirs = ['/usr/local/include'],
+                    libraries = ['tcl83'],
+                    library_dirs = ['/usr/local/lib'],
+                    sources = ['demo.c'])
+
+setup (name = 'PackageName',
+       version = '1.0',
+       description = 'This is a demo package',
+       author = 'Martin v. Loewis',
+       author_email = 'martin@v.loewis.de',
+       url = 'https://docs.python.org/extending/building',
+       ext_modules = [module1])
+```
+
+Then running `python setup.py build_ext --inplace` will result in distutils calling out to
+the compiler on Linux as follows:
+
+```
+gcc -DNDEBUG -g -O3 -Wall -Wstrict-prototypes -fPIC -DMAJOR_VERSION=1 -DMINOR_VERSION=0 -I/usr/local/include -I/usr/local/include/python2.2 -c demo.c -o build/temp.linux-i686-2.2/demo.o
+
+gcc -shared build/temp.linux-i686-2.2/demo.o -L/usr/local/lib -ltcl83 -o build/lib.linux-i686-2.2/demo.so
+```
