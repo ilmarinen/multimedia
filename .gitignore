@@ -3,3 +3,4 @@ build
 *.bmp
 *.o
 *.so
+__pycache__

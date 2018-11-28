@@ -4,8 +4,8 @@
 
 1. `python3 -m venv /path/to/new/virtual/environment`
 2. `source /path/to/new/virtual/environment/bin/activate`
-3. `pip install cython`
-4. `sudo apt-get install libpython3.6-dev`
+3. `sudo apt-get install libpython3.6-dev python3-dbg`
+4. `pip install -r requirements.txt`
 
 ## Build
 
@@ -130,3 +130,25 @@ gcc -DNDEBUG -g -O3 -Wall -Wstrict-prototypes -fPIC -DMAJOR_VERSION=1 -DMINOR_VE
 
 gcc -shared build/temp.linux-i686-2.2/demo.o -L/usr/local/lib -ltcl83 -o build/lib.linux-i686-2.2/demo.so
 ```
+
+### Using GDB
+
+Gdb is excellent for debugging. Using it with C code is relatively straightforward.
+
+1. Compile the C code with the `-g3` argument to make sure that debugging symbols are
+included.
+2. Set any breakpoints you need. For example `break code_filename.c:162` to set a breakpoint
+at line 162 of `code_filename.c`.
+3. Then run the program with `r <executable-name> <arguments>`
+
+You can also use gdb to debug Python code. This is especially useful for debugging
+issues with the Pymultimedia Cython extension. In order to do this you need to have
+the Python debugging symbols installed. To do this for Python3 simply do:
+
+`sudo apt-get install python3-dbg`
+
+Once those are installed you can debug as follows:
+
+1. `gdb python`
+2. Set any breakpoints you need, even breakpoints in C files.
+3. `r <program-name>.py <arguments>`

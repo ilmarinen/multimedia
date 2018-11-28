@@ -221,8 +221,10 @@ int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB2
             int Y, U, V;
 
             // YUV --> RGB colorspace conversion.
-            Y = pMovY[0]; U = *pMovU - 128; V = *pMovV - 128;   
-            R = Y_PLUS_RDIFF(Y, V); G = Y_PLUS_GDIFF(Y, U, V); B = Y_PLUS_BDIFF(Y, U);
+            Y = pMovY[0]; U = *pMovU; V = *pMovV;   
+            R = Y_PLUS_RDIFF(Y, V);
+            G = Y_PLUS_GDIFF(Y, U, V);
+            B = Y_PLUS_BDIFF(Y, U);
 
             // Clipping the value to the 0 - 255 range.
             *pMovRGB = CLIP1(B);
@@ -399,17 +401,17 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
     return 0;
 }
 
-int convolve2D(unsigned char* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
+int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
 {
     unsigned int padWidth;
     unsigned int i, j, k, l;
     unsigned int pitchPaddedGrayscale, pitchOutputGrayscale;
-    unsigned char result;
+    float result;
 
     unsigned char* paddedGrayscale;
     unsigned char* pMovPaddedGrayscale;
     unsigned char* pMovOutputGrayscale;
-    unsigned char* pMovKernel;
+    float* pMovKernel;
 
     padWidth = (kernelSize - 1) / 2;
 
@@ -424,19 +426,19 @@ int convolve2D(unsigned char* kernel, int kernelSize, unsigned char* inputGraysc
         for(i=padWidth; i < (padWidth + width); i++) {
             pMovOutputGrayscale = outputGrayscale + (j - padWidth)*pitchOutputGrayscale + (i - padWidth);
             pMovPaddedGrayscale = paddedGrayscale + j*pitchPaddedGrayscale + i;
-            result = 0;
+            result = 0.0;
             for(k=0; k < kernelSize; k++) {
                 for(l=0; l < kernelSize; l++) {
                     pMovKernel = kernel + (kernelSize - k - 1)*kernelSize + (kernelSize - l - 1);
                     pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*pitchPaddedGrayscale + (i - padWidth + l);
-                    result = result + (*pMovKernel) * (*pMovPaddedGrayscale);
+                    result = result + (*pMovKernel) * (float)(*pMovPaddedGrayscale);
                 }
             }
 
             if (result > 255) result = 255;
             else if (result < 0) result = 0;
 
-            *pMovOutputGrayscale = result;
+            *pMovOutputGrayscale = (unsigned char)result;
         }
     }
 
@@ -447,10 +449,10 @@ int convolve2D(unsigned char* kernel, int kernelSize, unsigned char* inputGraysc
 
 int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
 {
-    unsigned char kernel[9] =  {
-        1, 1, 1,
-        1, 1, 1,
-        1, 1, 1
+    float kernel[9] =  {
+        1/9.0, 1/9.0, 1/9.0,
+        1/9.0, 1/9.0, 1/9.0,
+        1/9.0, 1/9.0, 1/9.0
     };
 
     convolve2D(kernel, 3, inputGrayscale, width, height, outputGrayscale);

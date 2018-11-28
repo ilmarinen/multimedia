@@ -46,7 +46,7 @@ void process_image(const void *p, int size, unsigned int width, unsigned int hei
     unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale, *pGrayscalePadded, *pGrayscaleBlurred;
     pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*width)*height);
     pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
-    pGrayscalePadded = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*1)*482));
+    pGrayscalePadded = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*1)*(height + 2*1)));
     pGrayscaleBlurred = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pCroppedRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*(c_window.end_x - c_window.start_x))*(c_window.end_y - c_window.start_y));
 
@@ -173,6 +173,146 @@ int read_frame(int device_handle, buffers buffs,
         return 1;
 }
 
+int grab_frame(int device_handle, buffers buffs, unsigned char* image_buffer)
+{
+        struct v4l2_buffer buf;
+        unsigned int i;
+
+        switch (buffs.io_selection) {
+        case IO_METHOD_READ:
+                if (-1 == read(device_handle, buffs.buffers[0].start, buffs.buffers[0].length)) {
+                        switch (errno) {
+                        case EAGAIN:
+                                return 0;
+
+                        case EIO:
+                                /* Could ignore EIO, see spec. */
+
+                                /* fall through */
+
+                        default:
+                                errno_exit("read");
+                        }
+                }
+
+                // process_image(buffs.buffers[0].start, buffs.buffers[0].length, buffs.image_width, buffs.image_height,
+                //               output_filestring, frame_number, c_window);
+                memcpy(image_buffer, buffs.buffers[0].start, buffs.buffers[0].length);
+
+                break;
+
+        case IO_METHOD_MMAP:
+                CLEAR(buf);
+
+                buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                buf.memory = V4L2_MEMORY_MMAP;
+
+                if (-1 == xioctl(device_handle, VIDIOC_DQBUF, &buf)) {
+                        switch (errno) {
+                        case EAGAIN:
+                                return 0;
+
+                        case EIO:
+                                /* Could ignore EIO, see spec. */
+
+                                /* fall through */
+
+                        default:
+                                errno_exit("VIDIOC_DQBUF");
+                        }
+                }
+
+                assert(buf.index < buffs.n_buffers);
+
+                // process_image(buffs.buffers[buf.index].start, buf.bytesused, buffs.image_width, buffs.image_height,
+                //               output_filestring, frame_number, c_window);
+                memcpy(image_buffer, buffs.buffers[buf.index].start, buf.bytesused);
+
+                if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
+                        errno_exit("VIDIOC_QBUF");
+                break;
+
+        case IO_METHOD_USERPTR:
+                CLEAR(buf);
+
+                buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                buf.memory = V4L2_MEMORY_USERPTR;
+
+                if (-1 == xioctl(device_handle, VIDIOC_DQBUF, &buf)) {
+                        switch (errno) {
+                        case EAGAIN:
+                                return 0;
+
+                        case EIO:
+                                /* Could ignore EIO, see spec. */
+
+                                /* fall through */
+
+                        default:
+                                errno_exit("VIDIOC_DQBUF");
+                        }
+                }
+
+                for (i = 0; i < buffs.n_buffers; ++i)
+                        if (buf.m.userptr == (unsigned long)buffs.buffers[i].start
+                            && buf.length == buffs.buffers[i].length)
+                                break;
+
+                assert(i < buffs.n_buffers);
+
+                // process_image((void *)buf.m.userptr, buf.bytesused, buffs.image_width, buffs.image_height,
+                //               output_filestring, frame_number, c_window);
+                memcpy(image_buffer, (void *)buf.m.userptr, buf.bytesused);
+
+                if (-1 == xioctl(device_handle, VIDIOC_QBUF, &buf))
+                        errno_exit("VIDIOC_QBUF");
+                break;
+        }
+
+        return 1;
+}
+
+int grab_frame_yuyv(char* dev_name, int width, int height, unsigned char* image_buffer)
+{
+    int device_handle = 0;
+    buffers buffs;
+
+    device_handle = open_device(dev_name);
+    buffs = init_device(dev_name, device_handle, IO_METHOD_USERPTR, 0);
+    start_capturing(device_handle, buffs);
+    grab_frame(device_handle, buffs, image_buffer);
+    stop_capturing(device_handle, buffs);
+    uninit_device(buffs);
+    close_device(device_handle);
+
+    return 1;
+}
+
+int grab_frame_rgb(char* dev_name, int width, int height, unsigned char* image_buffer)
+{
+    int device_handle = 0;
+    buffers buffs;
+    unsigned char* image_buffer_yuyv;
+
+    image_buffer_yuyv = (unsigned char*)malloc(width*height*2);
+
+    device_handle = open_device(dev_name);
+    buffs = init_device(dev_name, device_handle, IO_METHOD_USERPTR, 0);
+    start_capturing(device_handle, buffs);
+
+    for(;;) {
+        if(grab_frame(device_handle, buffs, image_buffer_yuyv))
+            break;
+    }
+    YUYV2RGB24(image_buffer_yuyv, width, height, image_buffer);
+    stop_capturing(device_handle, buffs);
+    uninit_device(buffs);
+    close_device(device_handle);
+    free(image_buffer_yuyv);
+
+    return 1;
+}
+
 void mainloop(int device_handle, buffers buffs, int frame_count, char* output_filestring,
                      crop_window c_window)
 {
@@ -188,7 +328,7 @@ void mainloop(int device_handle, buffers buffs, int frame_count, char* output_fi
             FD_SET(device_handle, &fds);
 
             /* Timeout. */
-            tv.tv_sec = 2;
+            tv.tv_sec = 5;
             tv.tv_usec = 0;
 
             r = select(device_handle + 1, &fds, NULL, NULL, &tv);
@@ -543,8 +683,6 @@ buffers init_device(char* dev_name, int device_handle, enum io_method io_selecti
     if (fmt.fmt.pix.sizeimage < min)
         fmt.fmt.pix.sizeimage = min;
 
-    fprintf(stdout, "Resolution: %dx%d\n", fmt.fmt.pix.width, fmt.fmt.pix.height);
-
     switch (io_selection) {
     case IO_METHOD_READ:
         buffs = init_read(fmt.fmt.pix.sizeimage);
@@ -584,7 +722,34 @@ void print_formats(int device_handle)
         fprintf(stdout, "%s\n", fmtdesc.description);
         fmtdesc.index++;
     }
-};
+}
+
+resolution get_resolution(int device_handle)
+{
+    unsigned int min;
+    struct v4l2_format fmt;
+    resolution res;
+
+    CLEAR(fmt);
+
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    /* Preserve original settings as set by v4l2-ctl for example */
+    if (-1 == xioctl(device_handle, VIDIOC_G_FMT, &fmt))
+        errno_exit("VIDIOC_G_FMT");
+
+    /* Buggy driver paranoia. */
+    min = fmt.fmt.pix.width * 2;
+    if (fmt.fmt.pix.bytesperline < min)
+        fmt.fmt.pix.bytesperline = min;
+    min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
+    if (fmt.fmt.pix.sizeimage < min)
+        fmt.fmt.pix.sizeimage = min;
+
+    res.width = fmt.fmt.pix.width;
+    res.height = fmt.fmt.pix.height;
+
+    return res;
+}
 
 int open_device(char *device_name)
 {
