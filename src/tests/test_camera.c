@@ -16,11 +16,17 @@ void test_teardown(void) {
 MU_TEST(test_grab_frame_rgb) {
     unsigned char* pRGB;
     FILE *fp;
+    resolution res;
     long size = 0;
+    int dev_handle = 0;
 
-    pRGB = (unsigned char*)malloc(ALIGN_TO_FOUR(640*3)*480);
-    grab_frame_rgb("/dev/video0", 640, 480, pRGB);
-    BMPwriter(pRGB, 24, 640, 480, "test.bmp");
+    dev_handle = open_device("/dev/video0");
+    res = get_resolution(dev_handle);
+    close_device(dev_handle);
+
+    pRGB = (unsigned char*)malloc(ALIGN_TO_FOUR(res.width*3)*res.height);
+    grab_frame_rgb("/dev/video0", res.width, res.height, pRGB);
+    BMPwriter(pRGB, 24, res.width, res.height, "test.bmp");
 
     fp = fopen("test.bmp", "rb");
     fseek(fp, 0, SEEK_END);
@@ -29,7 +35,7 @@ MU_TEST(test_grab_frame_rgb) {
     remove("test.bmp");
     free(pRGB);
 
-    mu_check(size == (54 + ALIGN_TO_FOUR(640*3)*480));
+    mu_check(size == (54 + ALIGN_TO_FOUR(res.width*3)*res.height));
 }
 
 

@@ -85,10 +85,10 @@ MU_TEST(test_gaussian_blur) {
         };
 
         unsigned char pixelsBlurred[36] = {
-            12, 18, 18, 12,
-            18, 27, 27, 18,
-            18, 27, 27, 18,
-            12, 18, 18, 12
+            1, 2, 2, 1,
+            2, 2, 2, 2,
+            2, 2, 2, 2,
+            1, 2, 2, 1
         };
 
         pImage = (unsigned char*)malloc(4*4);
