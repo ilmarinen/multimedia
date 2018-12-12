@@ -42,28 +42,32 @@ void process_image(const void *p, int size, unsigned int width, unsigned int hei
 {
     char output_filename[50], output_cropped_filename[50],
          output_grayscale_filename[50], output_grayscale_padded_filename[50],
-         output_blurred_filename[50];
-    unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale, *pGrayscalePadded, *pGrayscaleBlurred;
+         output_blurred_uniform_filename[50], output_blurred_gaussian_filename[50];
+    unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale, *pGrayscalePadded, *pGrayscaleBlurred, *pGrayscaleBlurredGaussian;
     pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*width)*height);
     pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pGrayscalePadded = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*1)*(height + 2*1)));
     pGrayscaleBlurred = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
+    pGrayscaleBlurredGaussian = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pCroppedRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*(c_window.end_x - c_window.start_x))*(c_window.end_y - c_window.start_y));
 
     sprintf(output_filename, "%s-%d.bmp", output_filestring, frame_number);
     sprintf(output_cropped_filename, "%s-%d-cropped.bmp", output_filestring, frame_number);
     sprintf(output_grayscale_filename, "%s-%d-gray.bmp", output_filestring, frame_number);
     sprintf(output_grayscale_padded_filename, "%s-%d-gray-padded.bmp", output_filestring, frame_number);
-    sprintf(output_blurred_filename, "%s-%d-gray-blurred.bmp", output_filestring, frame_number);
+    sprintf(output_blurred_uniform_filename, "%s-%d-gray-blurred-uniform.bmp", output_filestring, frame_number);
+    sprintf(output_blurred_gaussian_filename, "%s-%d-gray-blurred-gaussian.bmp", output_filestring, frame_number);
 
     YUYV2RGB24((unsigned char *)p, width, height, pRGB24);
     RGB24toGrayscale(pRGB24, width, height, pGrayscale);
-    makeZeroPaddedImage(pGrayscale, width, height, 1, pGrayscalePadded);
-    GaussianBlur(pGrayscale, width, height, pGrayscaleBlurred);
+    makeZeroPaddedImage(pGrayscale, width, height, 1, pGrayscalePadded, VERTICAL_AND_HORIZONTAL);
+    UniformBlur(pGrayscale, width, height, pGrayscaleBlurred);
+    GaussianBlur(pGrayscale, width, height, pGrayscaleBlurredGaussian, 50.0);
 
     GrayScaleWriter(pGrayscale, width, height, output_grayscale_filename);
     GrayScaleWriter(pGrayscalePadded, (width + 2), (height + 2), output_grayscale_padded_filename);
-    GrayScaleWriter(pGrayscaleBlurred, width, height, output_blurred_filename);
+    GrayScaleWriter(pGrayscaleBlurred, width, height, output_blurred_uniform_filename);
+    GrayScaleWriter(pGrayscaleBlurredGaussian, width, height, output_blurred_gaussian_filename);
     cropRGB24(pRGB24, width, height, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
     BMPwriter(pCroppedRGB24, 24, (c_window.end_x - c_window.start_x), (c_window.end_y - c_window.start_y), output_cropped_filename);
     BMPwriter(pRGB24, 24, width, height, output_filename);
@@ -72,6 +76,7 @@ void process_image(const void *p, int size, unsigned int width, unsigned int hei
     free(pGrayscale);
     free(pGrayscalePadded);
     free(pGrayscaleBlurred);
+    free(pGrayscaleBlurredGaussian);
 
     fflush(stderr);
     fprintf(stderr, ".");

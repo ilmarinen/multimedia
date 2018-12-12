@@ -23,6 +23,12 @@
 #define CLIP1(XX)                 ((unsigned char)( (XX & ~255) ? (~XX >> 15) : XX ))
 
 
+enum direction {
+        VERTICAL,
+        HORIZONTAL,
+        VERTICAL_AND_HORIZONTAL,
+};
+
 typedef struct crop_w {
     int start_x;
     int start_y;
@@ -42,8 +48,11 @@ int GrayScaleWriter(unsigned char *pGrayscale, int width, int height, char* outp
 int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB24);
 int RGB24toGrayscale(unsigned char *inputRGB24, int width, int height, unsigned char *outputGrayscale);
 int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int startY, int endX, int endY, unsigned char* outputRGB24);
-int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int inputHeight, int padWidth, unsigned char *outputGrayscale);
+int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int inputHeight, int padWidth, unsigned char *outputGrayscale, enum direction ptype);
 int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
-int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
+int convolve2Dwith1Dkernel(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir);
+int UniformBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
+void getGaussianKernel1D(float* kernel, float sigma, int kernelSize);
+int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, float sigma);
 
 #endif

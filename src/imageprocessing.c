@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include <getopt.h>             /* getopt_long() */
 
@@ -349,7 +350,8 @@ int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int 
 
 }
 
-int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int inputHeight, int padWidth, unsigned char *outputGrayscale)
+int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int inputHeight, int padWidth, unsigned char *outputGrayscale,
+                        enum direction ptype)
 {
     unsigned int i, j;
     unsigned int pitchInputGrayscale, pitchOutputGrayscale;
@@ -359,42 +361,94 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
     pMovInputGrayscale = inputGrayscale;
     pMovOutputGrayscale = outputGrayscale;
 
-    pitchInputGrayscale = ALIGN_TO_FOUR(inputWidth);
-    pitchOutputGrayscale = ALIGN_TO_FOUR(inputWidth + 2*padWidth);
+    if (ptype == VERTICAL_AND_HORIZONTAL) {
+        pitchInputGrayscale = ALIGN_TO_FOUR(inputWidth);
+        pitchOutputGrayscale = ALIGN_TO_FOUR(inputWidth + 2*padWidth);
 
-    for(j=padWidth; j < (inputHeight + padWidth); j++) {
-        for(i=padWidth; i < (inputWidth + padWidth); i++) {
-            pMovInputGrayscale = inputGrayscale + (j - padWidth)*pitchInputGrayscale + (i - padWidth);
-            pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = *pMovInputGrayscale;
+        for(j=padWidth; j < (inputHeight + padWidth); j++) {
+            for(i=padWidth; i < (inputWidth + padWidth); i++) {
+                pMovInputGrayscale = inputGrayscale + (j - padWidth)*pitchInputGrayscale + (i - padWidth);
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = *pMovInputGrayscale;
+            }
         }
-    }
 
-    for(j=0; j < padWidth; j++) {
-        for(i=0; i < (inputWidth + 2*padWidth); i++) {
-            pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)0;
+        for(j=0; j < padWidth; j++) {
+            for(i=0; i < (inputWidth + 2*padWidth); i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
         }
-    }
 
-    for(j=(padWidth + inputHeight); j < (inputHeight + 2*padWidth); j++) {
-        for(i=0; i < (inputWidth + 2*padWidth); i++) {
-            pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)0;
+        for(j=(padWidth + inputHeight); j < (inputHeight + 2*padWidth); j++) {
+            for(i=0; i < (inputWidth + 2*padWidth); i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
         }
-    }
 
-    for(j=0; j < (2*padWidth + inputHeight); j++) {
-        for(i=0; i < padWidth; i++) {
-            pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)0;
+        for(j=0; j < (2*padWidth + inputHeight); j++) {
+            for(i=0; i < padWidth; i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
         }
-    }
 
-    for(j=0; j < (2*padWidth + inputHeight); j++) {
-        for(i=(padWidth + inputWidth); i < (inputWidth + 2*padWidth); i++) {
-            pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-            *pMovOutputGrayscale = (unsigned char)0;
+        for(j=0; j < (2*padWidth + inputHeight); j++) {
+            for(i=(padWidth + inputWidth); i < (inputWidth + 2*padWidth); i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
+        }
+    } else if (ptype == VERTICAL) {
+        pitchInputGrayscale = ALIGN_TO_FOUR(inputWidth);
+        pitchOutputGrayscale = ALIGN_TO_FOUR(inputWidth);
+
+        for(j=padWidth; j < (inputHeight + padWidth); j++) {
+            for(i=0; i < inputWidth; i++) {
+                pMovInputGrayscale = inputGrayscale + (j - padWidth)*pitchInputGrayscale + i;
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = *pMovInputGrayscale;
+            }
+        }
+
+        for(j=0; j < padWidth; j++) {
+            for(i=0; i < inputWidth; i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
+        }
+
+        for(j=(padWidth + inputHeight); j < (inputHeight + 2*padWidth); j++) {
+            for(i=0; i < inputWidth; i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
+        }
+    } else if (ptype == HORIZONTAL) {
+        pitchInputGrayscale = ALIGN_TO_FOUR(inputWidth);
+        pitchOutputGrayscale = ALIGN_TO_FOUR(inputWidth + 2*padWidth);
+
+        for(j=0; j < inputHeight; j++) {
+            for(i=padWidth; i < (inputWidth + padWidth); i++) {
+                pMovInputGrayscale = inputGrayscale + j*pitchInputGrayscale + (i - padWidth);
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = *pMovInputGrayscale;
+            }
+        }
+
+        for(j=0; j < inputHeight; j++) {
+            for(i=0; i < padWidth; i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
+        }
+
+        for(j=0; j < inputHeight; j++) {
+            for(i=(padWidth + inputWidth); i < (inputWidth + 2*padWidth); i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
+                *pMovOutputGrayscale = (unsigned char)0;
+            }
         }
     }
 
@@ -417,7 +471,7 @@ int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int
 
     paddedGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*padWidth)*(height + 2*padWidth)));
 
-    makeZeroPaddedImage(inputGrayscale, width, height, padWidth, paddedGrayscale);
+    makeZeroPaddedImage(inputGrayscale, width, height, padWidth, paddedGrayscale, VERTICAL_AND_HORIZONTAL);
 
     pitchPaddedGrayscale = ALIGN_TO_FOUR(width + 2*padWidth);
     pitchOutputGrayscale = ALIGN_TO_FOUR(width);
@@ -447,7 +501,83 @@ int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int
     return 0;
 }
 
-int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
+int convolve2Dwith1Dkernel(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir)
+{
+    unsigned int padWidth;
+    unsigned int i, j, k;
+    unsigned int pitchPaddedGrayscale, pitchOutputGrayscale;
+    float result;
+
+    unsigned char* paddedGrayscale;
+    unsigned char* pMovPaddedGrayscale;
+    unsigned char* pMovOutputGrayscale;
+    float* pMovKernel;
+
+    padWidth = (kernelSize - 1) / 2;
+
+    if (dir == VERTICAL) {
+        paddedGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width)*(height + 2*padWidth)));
+        makeZeroPaddedImage(inputGrayscale, width, height, padWidth, paddedGrayscale, VERTICAL);
+
+        pitchPaddedGrayscale = ALIGN_TO_FOUR(width);
+        pitchOutputGrayscale = ALIGN_TO_FOUR(width);
+
+        for(j=padWidth; j < (padWidth + height); j++) {
+            for(i=0; i < width; i++) {
+                pMovOutputGrayscale = outputGrayscale + (j - padWidth)*pitchOutputGrayscale + i;
+                pMovPaddedGrayscale = paddedGrayscale + j*pitchPaddedGrayscale + i;
+                result = 0.0;
+                for(k=0; k < kernelSize; k++) {
+                    pMovKernel = kernel + (kernelSize - k - 1);
+                    pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*pitchPaddedGrayscale + i;
+                    result = result + (*pMovKernel) * (float)(*pMovPaddedGrayscale);
+                }
+
+                if (result > 255) result = 255;
+                else if (result < 0) result = 0;
+
+                *pMovOutputGrayscale = (unsigned char)result;
+            }
+        }
+
+        free(paddedGrayscale);
+
+        return 0;
+
+    } else if (dir == HORIZONTAL) {
+        paddedGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*padWidth)*height));
+        makeZeroPaddedImage(inputGrayscale, width, height, padWidth, paddedGrayscale, HORIZONTAL);
+
+        pitchPaddedGrayscale = ALIGN_TO_FOUR(width + 2*padWidth);
+        pitchOutputGrayscale = ALIGN_TO_FOUR(width);
+
+        for(j=0; j < height; j++) {
+            for(i=padWidth; i < (padWidth + width); i++) {
+                pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + (i - padWidth);
+                pMovPaddedGrayscale = paddedGrayscale + j*pitchPaddedGrayscale + i;
+                result = 0.0;
+                for(k=0; k < kernelSize; k++) {
+                    pMovKernel = kernel + (kernelSize - k - 1);
+                    pMovPaddedGrayscale = paddedGrayscale + j*pitchPaddedGrayscale + (i - padWidth + k);
+                    result = result + (*pMovKernel) * (float)(*pMovPaddedGrayscale);
+                }
+
+                if (result > 255) result = 255;
+                else if (result < 0) result = 0;
+
+                *pMovOutputGrayscale = (unsigned char)result;
+            }
+        }
+
+        free(paddedGrayscale);
+
+        return 0;
+    }
+
+    return -1;
+}
+
+int UniformBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
 {
     float kernel[9] =  {
         1/9.0, 1/9.0, 1/9.0,
@@ -459,3 +589,40 @@ int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned 
 
     return 0;
 }
+
+void getGaussianKernel1D(float* kernel, float sigma, int kernelSize)
+{
+    int i, max;
+    float value, sum;
+
+    max = (kernelSize - 1) / 2.0;
+    sum = max;
+
+    kernel[max] = 1/(sigma *sqrt(2 * M_PI));
+    for(i=1; i <= max; i++) {
+        value = exp(-i*i/(2 * sigma * sigma))/(sigma *sqrt(2 * M_PI));
+        kernel[max - i] = value;
+        kernel[max + i] = value;
+        sum = sum + 2*value;
+    }
+}
+
+int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, float sigma)
+{
+    float* kernel;
+    int max, kernelSize;
+
+    max = (int) (3*sigma);
+    kernelSize = 2 * max + 1;
+
+    kernel = (float*)malloc(kernelSize * sizeof(float));
+    getGaussianKernel1D(kernel, sigma, kernelSize);
+
+    convolve2Dwith1Dkernel(kernel, kernelSize, inputGrayscale, width, height, outputGrayscale, VERTICAL);
+    convolve2Dwith1Dkernel(kernel, kernelSize, inputGrayscale, width, height, outputGrayscale, HORIZONTAL);
+
+    free(kernel);
+
+    return 0;
+}
+
