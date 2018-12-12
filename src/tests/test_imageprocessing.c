@@ -149,7 +149,7 @@ MU_TEST(test_uniform_blur) {
 
         for(j=0; j < 4; j++) {
             for(i=0; i < 4; i++) {
-                mu_check(*(pixelsBlurred + imagePitch*j + i) == *(pBlurredImage + j*imagePitch + i));
+                mu_check(abs(*(pixelsBlurred + imagePitch*j + i) - *(pBlurredImage + j*imagePitch + i)) <= 1);
             }
         }
 
@@ -164,7 +164,7 @@ MU_TEST(test_convolve2dwith1dkernel) {
         unsigned char* pImage;
         unsigned char* pBlurredImage;
 
-        float kernel[3] = {1.0, 1.0, 1.0};
+        double kernel[3] = {1.0, 1.0, 1.0};
 
         unsigned char pixels[16] = {
             3, 3, 3, 3,
@@ -216,15 +216,50 @@ MU_TEST(test_convolve2dwith1dkernel) {
 }
 
 MU_TEST(test_getGaussianKernel1d) {
-    float* kernel;
+    double* kernel;
 
-    kernel = (float *)malloc(5 * sizeof(float));
+    kernel = (double *)malloc(5 * sizeof(double));
 
     getGaussianKernel1D(kernel, 1.0, 5);
 
     mu_check(abs(kernel[2] - 0.398) < 0.0001);
 
     free(kernel);
+}
+
+MU_TEST(test_GaussianBlur) {
+    double* kernel;
+    unsigned char* outputGrayscale2d;
+    unsigned char* outputGrayscaleSeparable;
+    unsigned char* pOutput2d;
+    unsigned char* pOutputSeparable;
+    int i, j;
+
+    unsigned char pixels[16] = {
+        30, 30, 30, 30,
+        30, 30, 30, 30,
+        30, 30, 30, 30,
+        30, 30, 30, 30
+    };
+
+    kernel = (double *)malloc(5 * 5 * sizeof(double));
+    outputGrayscale2d = (unsigned char *)malloc(ALIGN_TO_FOUR(4) * 4);
+    outputGrayscaleSeparable = (unsigned char *)malloc(ALIGN_TO_FOUR(4) * 4);
+
+    GaussianBlur2DKernel(pixels, 4, 4, outputGrayscale2d, 1.0);
+    GaussianBlur(pixels, 4, 4, outputGrayscaleSeparable, 1.0);
+
+    for(j=0; j < 4; j++) {
+        for(i=0; i < 4; i++) {
+            pOutput2d = outputGrayscale2d + 4 * j + i;
+            pOutputSeparable = outputGrayscaleSeparable + 4 * j + i;
+            mu_check(abs(*pOutput2d - *pOutputSeparable) <= 1);
+        }
+    }
+
+    free(kernel);
+    free(outputGrayscale2d);
+    free(outputGrayscaleSeparable);
 }
 
 MU_TEST_SUITE(test_suite) {
@@ -235,6 +270,7 @@ MU_TEST_SUITE(test_suite) {
     MU_RUN_TEST(test_uniform_blur);
     MU_RUN_TEST(test_convolve2dwith1dkernel);
     MU_RUN_TEST(test_getGaussianKernel1d);
+    MU_RUN_TEST(test_GaussianBlur);
 }
 
 int main(int argc, char *argv[]) {

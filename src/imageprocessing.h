@@ -49,10 +49,12 @@ int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB2
 int RGB24toGrayscale(unsigned char *inputRGB24, int width, int height, unsigned char *outputGrayscale);
 int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int startY, int endX, int endY, unsigned char* outputRGB24);
 int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int inputHeight, int padWidth, unsigned char *outputGrayscale, enum direction ptype);
-int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
-int convolve2Dwith1Dkernel(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir);
+int convolve2D(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
+int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir);
 int UniformBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
-void getGaussianKernel1D(float* kernel, float sigma, int kernelSize);
-int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, float sigma);
+void getGaussianKernel1D(double* kernel, double sigma, int kernelSize);
+void getGaussianKernel2D(double* kernel, double sigma, int kernelSize);
+int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma);
+int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma);
 
 #endif

@@ -455,17 +455,17 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
     return 0;
 }
 
-int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
+int convolve2D(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
 {
     unsigned int padWidth;
     unsigned int i, j, k, l;
     unsigned int pitchPaddedGrayscale, pitchOutputGrayscale;
-    float result;
+    double result;
 
     unsigned char* paddedGrayscale;
     unsigned char* pMovPaddedGrayscale;
     unsigned char* pMovOutputGrayscale;
-    float* pMovKernel;
+    double* pMovKernel;
 
     padWidth = (kernelSize - 1) / 2;
 
@@ -485,7 +485,7 @@ int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int
                 for(l=0; l < kernelSize; l++) {
                     pMovKernel = kernel + (kernelSize - k - 1)*kernelSize + (kernelSize - l - 1);
                     pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*pitchPaddedGrayscale + (i - padWidth + l);
-                    result = result + (*pMovKernel) * (float)(*pMovPaddedGrayscale);
+                    result = result + (*pMovKernel) * (double)(*pMovPaddedGrayscale);
                 }
             }
 
@@ -501,17 +501,17 @@ int convolve2D(float* kernel, int kernelSize, unsigned char* inputGrayscale, int
     return 0;
 }
 
-int convolve2Dwith1Dkernel(float* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir)
+int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir)
 {
     unsigned int padWidth;
     unsigned int i, j, k;
     unsigned int pitchPaddedGrayscale, pitchOutputGrayscale;
-    float result;
+    double result;
 
     unsigned char* paddedGrayscale;
     unsigned char* pMovPaddedGrayscale;
     unsigned char* pMovOutputGrayscale;
-    float* pMovKernel;
+    double* pMovKernel;
 
     padWidth = (kernelSize - 1) / 2;
 
@@ -530,7 +530,7 @@ int convolve2Dwith1Dkernel(float* kernel, int kernelSize, unsigned char* inputGr
                 for(k=0; k < kernelSize; k++) {
                     pMovKernel = kernel + (kernelSize - k - 1);
                     pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*pitchPaddedGrayscale + i;
-                    result = result + (*pMovKernel) * (float)(*pMovPaddedGrayscale);
+                    result = result + (*pMovKernel) * (double)(*pMovPaddedGrayscale);
                 }
 
                 if (result > 255) result = 255;
@@ -559,7 +559,7 @@ int convolve2Dwith1Dkernel(float* kernel, int kernelSize, unsigned char* inputGr
                 for(k=0; k < kernelSize; k++) {
                     pMovKernel = kernel + (kernelSize - k - 1);
                     pMovPaddedGrayscale = paddedGrayscale + j*pitchPaddedGrayscale + (i - padWidth + k);
-                    result = result + (*pMovKernel) * (float)(*pMovPaddedGrayscale);
+                    result = result + (*pMovKernel) * (double)(*pMovPaddedGrayscale);
                 }
 
                 if (result > 255) result = 255;
@@ -579,7 +579,7 @@ int convolve2Dwith1Dkernel(float* kernel, int kernelSize, unsigned char* inputGr
 
 int UniformBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
 {
-    float kernel[9] =  {
+    double kernel[9] =  {
         1/9.0, 1/9.0, 1/9.0,
         1/9.0, 1/9.0, 1/9.0,
         1/9.0, 1/9.0, 1/9.0
@@ -590,10 +590,10 @@ int UniformBlur(unsigned char* inputGrayscale, int width, int height, unsigned c
     return 0;
 }
 
-void getGaussianKernel1D(float* kernel, float sigma, int kernelSize)
+void getGaussianKernel1D(double* kernel, double sigma, int kernelSize)
 {
     int i, max;
-    float value, sum;
+    double value, sum;
 
     max = (kernelSize - 1) / 2.0;
     sum = max;
@@ -607,21 +607,68 @@ void getGaussianKernel1D(float* kernel, float sigma, int kernelSize)
     }
 }
 
-int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, float sigma)
+void getGaussianKernel2D(double* kernel, double sigma, int kernelSize)
 {
-    float* kernel;
+    int i, j, max;
+    double value, sum;
+    double* pKernelMov;
+
+    max = (kernelSize - 1) / 2.0;
+
+    pKernelMov = kernel + max*kernelSize + max;
+
+    sum = 0.0;
+    for(j=0; j < kernelSize; j++) {
+        for(i=0; i < kernelSize; i++) {
+            pKernelMov = kernel + j*kernelSize + i;
+            value = (double)exp(-((i - max)*(i - max) + ((j - max)*(j - max)))/(2 * sigma * sigma))/(sigma *sqrt(2 * M_PI));
+            *pKernelMov = value;
+            sum = sum + value;
+        }
+    }
+
+    for(i=0; i < (kernelSize * kernelSize); i++) {
+        kernel[i] = kernel[i] / sum;
+    }
+}
+
+int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma)
+{
+    double* kernel;
+    int kernelSize;
+
+    kernelSize = 2 * ((int) (3*sigma)) + 1;
+
+    kernel = (double *)malloc(kernelSize * kernelSize * sizeof(double));
+
+    getGaussianKernel2D(kernel, sigma, kernelSize);
+
+    convolve2D(kernel, kernelSize, inputGrayscale, width, height, outputGrayscale);
+
+    free(kernel);
+
+    return 0;
+}
+
+int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma)
+{
+    double* kernel;
     int max, kernelSize;
+    unsigned char* tempGrayscaleV;
+
+    tempGrayscaleV = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
 
     max = (int) (3*sigma);
     kernelSize = 2 * max + 1;
 
-    kernel = (float*)malloc(kernelSize * sizeof(float));
+    kernel = (double*)malloc(kernelSize * sizeof(double));
     getGaussianKernel1D(kernel, sigma, kernelSize);
 
-    convolve2Dwith1Dkernel(kernel, kernelSize, inputGrayscale, width, height, outputGrayscale, VERTICAL);
-    convolve2Dwith1Dkernel(kernel, kernelSize, inputGrayscale, width, height, outputGrayscale, HORIZONTAL);
+    convolve2Dwith1Dkernel(kernel, kernelSize, inputGrayscale, width, height, tempGrayscaleV, VERTICAL);
+    convolve2Dwith1Dkernel(kernel, kernelSize, tempGrayscaleV, width, height, outputGrayscale, HORIZONTAL);
 
     free(kernel);
+    free(tempGrayscaleV);
 
     return 0;
 }
