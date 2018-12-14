@@ -29,10 +29,10 @@
 
 ### Make
 
-A makefile typically has a start where variables are diclared at the start, eg:
+A makefile typically has a start where variables are declared at the start, eg:
 
 ```
-CC = gcc
+CC=gcc
 LIB_DIR=lib
 INCLUDE_DIR=include
 SRC_DIR=src
@@ -77,7 +77,7 @@ The above script will attempt to build the targets `multimedia` and `pymultimedi
 at the command line.
 
 It will only attempt to build those targets if their respective dependencies have fresher
-timestamps. If for some reasona a dependency is missing, then make will throw an error.
+timestamps. If for some reason a dependency is missing, then make will throw an error.
 
 ### Cython
 
@@ -99,7 +99,7 @@ within the modules `setup.py` file.
 An excellent resource on this is [here](https://docs.python.org/2/extending/building.html)
 The TLDR is as follows:
 
-If the following script is in `stup.py`
+If the following script is in `setup.py`
 
 
 ```
