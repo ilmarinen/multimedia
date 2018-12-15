@@ -23,18 +23,18 @@
 void usage(FILE *fp, int argc, char **argv, char* dev_name, int frame_count)
 {
         fprintf(fp,
-                 "Usage: %s [options]\\n\\n"
-                 "Version 1.3\\n"
-                 "Options:\\n"
-                 "-d | --device name   Video device name [%s]n"
-                 "-h | --help          Print this messagen"
-                 "-m | --mmap          Use memory mapped buffers [default]n"
-                 "-r | --read          Use read() callsn"
-                 "-u | --userp         Use application allocated buffersn"
-                 "-o | --output        Outputs stream to stdoutn"
-                 "-f | --format        Force format to 640x480 YUYVn"
-                 "-c | --count         Number of frames to grab [%i]n"
-                 "-w | --window        Crop window"
+                 "Usage: %s [options]\n"
+                 "Version 1.3\n"
+                 "Options:\n"
+                 "-d  | --device name   Video device name [%s]n\n"
+                 "-h  | --help          Print this messagen\n"
+                 "-m  | --mmap          Use memory mapped buffers [default]n\n"
+                 "-r  | --read          Use read() callsn\n"
+                 "-u  | --userp         Use application allocated buffersn\n"
+                 "-o  | --output        Outputs stream to stdoutn\n"
+                 "-f  | --format        Force format to 640x480 YUYVn\n"
+                 "-c  | --count         Number of frames to grab [%i]n\n"
+                 "-w  | --window        Crop window\n"
                  "",
                  argv[0], dev_name, frame_count);
 }
