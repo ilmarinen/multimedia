@@ -144,6 +144,6 @@ int main(int argc, char **argv)
     stop_capturing(device_handle, buffs);
     uninit_device(buffs);
     close_device(device_handle);
-    fprintf(stderr, "\\n");
+    fprintf(stderr, "\n");
     return 0;
 }
