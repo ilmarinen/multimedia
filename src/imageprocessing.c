@@ -607,6 +607,36 @@ void getGaussianKernel1D(double* kernel, double sigma, int kernelSize)
     }
 }
 
+void getDGausianKernel1D(double* kernel, double sigma, int kernelSize)
+{
+    int i, max;
+    double value, sum;
+
+    max = (kernelSize - 1) / 2.0;
+    sum = 0.0;
+
+    for(i=0; i <= 2 * max; i++) {
+        value = (-(i - max)/(sigma * sigma)) * exp(-(i - max)*(i - max)/(2 * sigma * sigma))/(sigma *sqrt(2 * M_PI));
+        kernel[i] = value;
+        sum = sum + kernel[i];
+    }
+}
+
+void getD2GausianKernel1D(double* kernel, double sigma, int kernelSize)
+{
+    int i, max;
+    double value, sum;
+
+    max = (kernelSize - 1) / 2.0;
+    sum = 0.0;
+
+    for(i=0; i <= 2 * max; i++) {
+        value = (-1.0/(sigma * sigma) + ((i - max) * (i - max)/(sigma * sigma * sigma * sigma))) * exp(-(i - max)*(i - max)/(2 * sigma * sigma))/(sigma *sqrt(2 * M_PI));
+        kernel[i] = value;
+        sum = sum + kernel[i];
+    }
+}
+
 void getGaussianKernel2D(double* kernel, double sigma, int kernelSize)
 {
     int i, j, max;
@@ -632,6 +662,116 @@ void getGaussianKernel2D(double* kernel, double sigma, int kernelSize)
     }
 }
 
+int GaussianDerivativeX(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+{
+    double* kernel_x;
+    double* kernel_y;
+    int kernel_size;
+    unsigned char* temp_grayscale_v;
+
+    kernel_size = 2 * ((int) (3*sigma)) + 1;
+
+    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+
+    getDGausianKernel1D(kernel_x, sigma, kernel_size);
+    getGaussianKernel1D(kernel_y, sigma, kernel_size);
+
+    convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
+    convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
+
+    return 0;
+}
+
+int GaussianDerivativeY(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+{
+    double* kernel_x;
+    double* kernel_y;
+    int kernel_size;
+    unsigned char* temp_grayscale_v;
+
+    kernel_size = 2 * ((int) (3*sigma)) + 1;
+
+    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+
+    getDGausianKernel1D(kernel_y, sigma, kernel_size);
+    getGaussianKernel1D(kernel_x, sigma, kernel_size);
+
+    convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
+    convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
+
+    return 0;
+}
+
+int GaussianDerivativeXX(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+{
+    double* kernel_x;
+    double* kernel_y;
+    int kernel_size;
+    unsigned char* temp_grayscale_v;
+
+    kernel_size = 2 * ((int) (3*sigma)) + 1;
+
+    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+
+    getD2GausianKernel1D(kernel_x, sigma, kernel_size);
+    getGaussianKernel1D(kernel_y, sigma, kernel_size);
+
+    convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
+    convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
+
+    return 0;
+}
+
+int GaussianDerivativeYY(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+{
+    double* kernel_x;
+    double* kernel_y;
+    int kernel_size;
+    unsigned char* temp_grayscale_v;
+
+    kernel_size = 2 * ((int) (3*sigma)) + 1;
+
+    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+
+    getD2GausianKernel1D(kernel_y, sigma, kernel_size);
+    getGaussianKernel1D(kernel_x, sigma, kernel_size);
+
+    convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
+    convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
+
+    return 0;
+}
+
+int GaussianDerivativeXY(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+{
+    double* kernel_x;
+    double* kernel_y;
+    int kernel_size;
+    unsigned char* temp_grayscale_v;
+
+    kernel_size = 2 * ((int) (3*sigma)) + 1;
+
+    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+
+    getGaussianKernel1D(kernel_x, sigma, kernel_size);
+    getGaussianKernel1D(kernel_y, sigma, kernel_size);
+
+    convolve2Dwith1Dkernel(kernel_x, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
+    convolve2Dwith1Dkernel(kernel_y, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
+
+    return 0;
+}
+
 int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma)
 {
     double* kernel;
@@ -646,6 +786,70 @@ int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, u
     convolve2D(kernel, kernelSize, inputGrayscale, width, height, outputGrayscale);
 
     free(kernel);
+
+    return 0;
+}
+
+int CannyEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold)
+{
+    unsigned int i, j, pitch;
+    unsigned char* input_grayscale_DX;
+    unsigned char* input_grayscale_DXX;
+    unsigned char* input_grayscale_DY;
+    unsigned char* input_grayscale_DYY;
+    unsigned char* input_grayscale_DXY;
+    unsigned char* p_DX;
+    unsigned char* p_DXX;
+    unsigned char* p_DY;
+    unsigned char* p_DYY;
+    unsigned char* p_DXY;
+    unsigned char* p_output;
+    double norm_squared_gradient, magnitude_second_order_directional_derivative, squared_threshold;
+
+    input_grayscale_DX = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    input_grayscale_DXX = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    input_grayscale_DY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    input_grayscale_DYY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    input_grayscale_DXY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+
+    GaussianDerivativeX(input_grayscale, width, height, input_grayscale_DX, sigma);
+    GaussianDerivativeXX(input_grayscale, width, height, input_grayscale_DXX, sigma);
+    GaussianDerivativeY(input_grayscale, width, height, input_grayscale_DY, sigma);
+    GaussianDerivativeYY(input_grayscale, width, height, input_grayscale_DYY, sigma);
+    GaussianDerivativeXY(input_grayscale, width, height, input_grayscale_DXY, sigma);
+
+    squared_threshold = threshold * threshold;
+
+    pitch = ALIGN_TO_FOUR(width);
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_DX = input_grayscale_DX + pitch * j + i;
+            p_DXX = input_grayscale_DXX + pitch * j + i;
+            p_DY = input_grayscale_DY + pitch * j + i;
+            p_DYY = input_grayscale_DYY + pitch * j + i;
+            p_DXY = input_grayscale_DXY + pitch * j + i;
+            p_output = output_grayscale + pitch * j + i;
+
+            norm_squared_gradient = (*p_DX) * (*p_DX) + (*p_DY) * (*p_DY);
+
+            *p_output = 0;
+
+            if (norm_squared_gradient >= squared_threshold) {
+                magnitude_second_order_directional_derivative = abs((*p_DX) * (*p_DX) * (*p_DXX) + 2*(*p_DX) * (*p_DY) * (*p_DXY) + (*p_DY) * (*p_DY) * (*p_DYY));
+
+                if ((magnitude_second_order_directional_derivative < 1e-6) && (norm_squared_gradient) >= cutoff_threshold) {
+                    *p_output = norm_squared_gradient;
+                }
+            }
+        }
+    }
+
+    free(input_grayscale_DX);
+    free(input_grayscale_DXX);
+    free(input_grayscale_DY);
+    free(input_grayscale_DYY);
+    free(input_grayscale_DXY);
 
     return 0;
 }
