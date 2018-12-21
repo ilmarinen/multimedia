@@ -790,7 +790,7 @@ int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, u
     return 0;
 }
 
-int CannyEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold)
+int DifferentialEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold)
 {
     unsigned int i, j, pitch;
     unsigned char* input_grayscale_DX;
@@ -850,6 +850,79 @@ int CannyEdgeDetector(unsigned char* input_grayscale, int width, int height, uns
     free(input_grayscale_DY);
     free(input_grayscale_DYY);
     free(input_grayscale_DXY);
+
+    return 0;
+}
+
+int CornerDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double sigma_w, double k, double threshold)
+{
+    unsigned int i, j, pitch;
+    unsigned char* input_grayscale_DX_squared;
+    unsigned char* input_grayscale_DY_squared;
+    unsigned char* input_grayscale_DXDY;
+    unsigned char* s_x2;
+    unsigned char* s_y2;
+    unsigned char* s_xy;
+    unsigned char* p_DX_squared;
+    unsigned char* p_DY_squared;
+    unsigned char* p_DXDY;
+    unsigned char* p_sx2;
+    unsigned char* p_sy2;
+    unsigned char* p_sxy;
+    unsigned char* p_output;
+    double harris_corner_response;
+
+    input_grayscale_DX_squared = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    input_grayscale_DY_squared = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    input_grayscale_DXDY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    s_x2 = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    s_y2 = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    s_xy = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+
+    GaussianDerivativeX(input_grayscale, width, height, input_grayscale_DX_squared, sigma);
+    GaussianDerivativeY(input_grayscale, width, height, input_grayscale_DY_squared, sigma);
+
+    pitch = ALIGN_TO_FOUR(width);
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_DX_squared = input_grayscale_DX_squared + pitch * j + i;
+            p_DY_squared = input_grayscale_DY_squared + pitch * j + i;
+            p_DXDY = input_grayscale_DXDY + pitch * j + i;
+
+            *p_DXDY = (*p_DX_squared) * (*p_DX_squared);
+            *p_DX_squared = (*p_DX_squared) * (*p_DX_squared);
+            *p_DY_squared = (*p_DY_squared) * (*p_DY_squared);
+        }
+    }
+
+    GaussianBlur(input_grayscale_DX_squared, width, height, s_x2, sigma_w);
+    GaussianBlur(input_grayscale_DY_squared, width, height, s_y2, sigma_w);
+    GaussianBlur(input_grayscale_DXDY, width, height, s_xy, sigma_w);
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_sx2 = s_x2 + pitch * j + i;
+            p_sy2 = s_y2 + pitch * j + i;
+            p_sxy = s_xy + pitch * j + i;
+            p_output = output_grayscale + pitch * j + i;
+
+            harris_corner_response = (((*p_sx2) * (*p_sy2)) - ((*p_sxy) * (*p_sxy))) - k * ((*p_sx2)  + (*p_sy2)) * ((*p_sx2)  + (*p_sy2));
+
+            *p_output = 0;
+
+            if (harris_corner_response > threshold) {
+                *p_output = 255;
+            }
+        }
+    }
+
+    free(input_grayscale_DX_squared);
+    free(input_grayscale_DY_squared);
+    free(input_grayscale_DXDY);
+    free(s_x2);
+    free(s_y2);
+    free(s_xy);
 
     return 0;
 }

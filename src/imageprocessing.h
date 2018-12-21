@@ -56,6 +56,7 @@ void getGaussianKernel1D(double* kernel, double sigma, int kernelSize);
 void getGaussianKernel2D(double* kernel, double sigma, int kernelSize);
 int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma);
 int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma);
-int CannyEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold);
+int DifferentialEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold);
+int CornerDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double sigma_w, double k, double threshold);
 
 #endif
