@@ -152,3 +152,15 @@ Once those are installed you can debug as follows:
 1. `gdb python`
 2. Set any breakpoints you need, even breakpoints in C files.
 3. `r <program-name>.py <arguments>`
+
+### Development Guidelines
+
+If you are interesting in contributing to this project, that's excellent and welcomed! There are some guidelines for managing branches and pull requests.
+
+#### How to Manage a Pull Request
+1. Before making the pull request, rebase off master and squash all commits in the branch into one commit.
+- *If you are unfamiliar with rebasing, please ask other contributor and find some resources, like this one*:
+-- https://git-scm.com/book/en/v2/Git-Branching-Rebasing
+2. Commit messages should have one short summary line on the order of 65 chars. Then a blank line and a paragraph description of the commit using assertive tense, i.e.  implement the edge detector and rename function A to function B etc.
+3. During code review if changes are requested, push those as individual commits so that the reviewer(s) can see the changes being made.
+4. Code review approval is with a mention and a comment of +1 or +2. The +1 means, "I don't really understand all the code but this looks right to me". The +2 means, "I have read all the code and understand it and this looks right to me". In order to merge code, you need a +2 or two +1s from different reviewers.
