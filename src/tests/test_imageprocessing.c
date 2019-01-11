@@ -34,49 +34,49 @@ MU_TEST(test_grayscale_writer) {
 MU_TEST(test_padded_grayscale) {
         int i, j;
         int imagePitch, paddedImagePitch;
-        unsigned char* pImage;
-        unsigned char* pGrayscalePaddedVandH;
-        unsigned char* pGrayscalePaddedV;
-        unsigned char* pGrayscalePaddedH;
-        unsigned char pixels[16] = {
-            3, 3, 3, 3,
-            3, 3, 3, 3,
-            3, 3, 3, 3,
-            3, 3, 3, 3
+        double* pImage;
+        double* pGrayscalePaddedVandH;
+        double* pGrayscalePaddedV;
+        double* pGrayscalePaddedH;
+        double pixels[16] = {
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0
         };
 
-        unsigned char pixelsPaddedVandH[36] = {
-            0, 0, 0, 0, 0, 0,
-            0, 3, 3, 3, 3, 0,
-            0, 3, 3, 3, 3, 0,
-            0, 3, 3, 3, 3, 0,
-            0, 3, 3, 3, 3, 0,
-            0, 0, 0, 0, 0, 0
+        double pixelsPaddedVandH[36] = {
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         };
 
-        unsigned char pixelsPaddedV[24] = {
-            0, 0, 0, 0,
-            3, 3, 3, 3,
-            3, 3, 3, 3,
-            3, 3, 3, 3,
-            3, 3, 3, 3,
-            0, 0, 0, 0,
+        double pixelsPaddedV[24] = {
+            0.0, 0.0, 0.0, 0.0,
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0,
+            0.0, 0.0, 0.0, 0.0,
         };
 
-        unsigned char pixelsPaddedH[24] = {
-            0, 3, 3, 3, 3, 0,
-            0, 3, 3, 3, 3, 0,
-            0, 3, 3, 3, 3, 0,
-            0, 3, 3, 3, 3, 0,
+        double pixelsPaddedH[24] = {
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
+            0.0, 3.0, 3.0, 3.0, 3.0, 0.0,
         };
 
-        pImage = (unsigned char*)malloc(4*4);
-        pGrayscalePaddedVandH = (unsigned char*)malloc(ALIGN_TO_FOUR(4 + 2*1)*6);
+        pImage = (double*)malloc(4*4*sizeof(double));
+        pGrayscalePaddedVandH = (double*)malloc(6*6*sizeof(double));
 
         imagePitch = 4;
-        paddedImagePitch = ALIGN_TO_FOUR(4 + 2*1);
+        paddedImagePitch = 4 + 2*1;
 
-        memcpy(pImage, pixels, 16);
+        memcpy(pImage, pixels, 16*sizeof(double));
         makeZeroPaddedImage(pImage, 4, 4, 1, pGrayscalePaddedVandH, VERTICAL_AND_HORIZONTAL);
 
         for(j=0; j < 6; j++) {
@@ -85,12 +85,12 @@ MU_TEST(test_padded_grayscale) {
             }
         }
 
-        pGrayscalePaddedV = (unsigned char*)malloc(ALIGN_TO_FOUR(4)*6);
+        pGrayscalePaddedV = (double*)malloc(4*6*sizeof(double));
 
         imagePitch = 4;
-        paddedImagePitch = ALIGN_TO_FOUR(4);
+        paddedImagePitch = 4;
 
-        memcpy(pImage, pixels, 16);
+        memcpy(pImage, pixels, 16*sizeof(double));
         makeZeroPaddedImage(pImage, 4, 4, 1, pGrayscalePaddedV, VERTICAL);
 
         for(j=0; j < 6; j++) {
@@ -99,12 +99,12 @@ MU_TEST(test_padded_grayscale) {
             }
         }
 
-        pGrayscalePaddedH = (unsigned char*)malloc(ALIGN_TO_FOUR(4 + 2*1)*4);
+        pGrayscalePaddedH = (double*)malloc((4 + 2*1)*4*sizeof(double));
 
         imagePitch = 4;
-        paddedImagePitch = ALIGN_TO_FOUR(4 + 2*1);
+        paddedImagePitch = 4 + 2*1;
 
-        memcpy(pImage, pixels, 16);
+        memcpy(pImage, pixels, 16*sizeof(double));
         makeZeroPaddedImage(pImage, 4, 4, 1, pGrayscalePaddedH, HORIZONTAL);
 
         for(j=0; j < 4; j++) {
@@ -161,38 +161,38 @@ MU_TEST(test_uniform_blur) {
 MU_TEST(test_convolve2dwith1dkernel) {
         int i, j;
         int imagePitch, paddedImagePitch;
-        unsigned char* pImage;
-        unsigned char* pBlurredImage;
+        double* pImage;
+        double* pBlurredImage;
 
         double kernel[3] = {1.0, 1.0, 1.0};
 
-        unsigned char pixels[16] = {
-            3, 3, 3, 3,
-            3, 3, 3, 3,
-            3, 3, 3, 3,
-            3, 3, 3, 3
+        double pixels[16] = {
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0,
+            3.0, 3.0, 3.0, 3.0
         };
 
-        unsigned char pixelsBlurredV[16] = {
-            6, 6, 6, 6,
-            9, 9, 9, 9,
-            9, 9, 9, 9,
-            6, 6, 6, 6
+        double pixelsBlurredV[16] = {
+            6.0, 6.0, 6.0, 6.0,
+            9.0, 9.0, 9.0, 9.0,
+            9.0, 9.0, 9.0, 9.0,
+            6.0, 6.0, 6.0, 6.0
         };
 
-        unsigned char pixelsBlurredH[16] = {
-            6, 9, 9, 6,
-            6, 9, 9, 6,
-            6, 9, 9, 6,
-            6, 9, 9, 6
+        double pixelsBlurredH[16] = {
+            6.0, 9.0, 9.0, 6.0,
+            6.0, 9.0, 9.0, 6.0,
+            6.0, 9.0, 9.0, 6.0,
+            6.0, 9.0, 9.0, 6.0
         };
 
-        pImage = (unsigned char*)malloc(4*4);
-        pBlurredImage = (unsigned char*)malloc(4*4);
+        pImage = (double*)malloc(4*4*sizeof(double));
+        pBlurredImage = (double*)malloc(4*4*sizeof(double));
 
         imagePitch = 4;
 
-        memcpy(pImage, pixels, 16);
+        memcpy(pImage, pixels, 16*sizeof(double));
 
         convolve2Dwith1Dkernel(kernel, 3, pImage, 4, 4, pBlurredImage, VERTICAL);
 

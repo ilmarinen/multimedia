@@ -350,20 +350,20 @@ int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int 
 
 }
 
-int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int inputHeight, int padWidth, unsigned char *outputGrayscale,
+int makeZeroPaddedImage(double *inputGrayscale, int inputWidth, int inputHeight, int padWidth, double *outputGrayscale,
                         enum direction ptype)
 {
     unsigned int i, j;
     unsigned int pitchInputGrayscale, pitchOutputGrayscale;
-    unsigned char* pMovInputGrayscale;
-    unsigned char* pMovOutputGrayscale;
+    double* pMovInputGrayscale;
+    double* pMovOutputGrayscale;
 
     pMovInputGrayscale = inputGrayscale;
     pMovOutputGrayscale = outputGrayscale;
 
     if (ptype == VERTICAL_AND_HORIZONTAL) {
-        pitchInputGrayscale = ALIGN_TO_FOUR(inputWidth);
-        pitchOutputGrayscale = ALIGN_TO_FOUR(inputWidth + 2*padWidth);
+        pitchInputGrayscale = inputWidth;
+        pitchOutputGrayscale = inputWidth + 2*padWidth;
 
         for(j=padWidth; j < (inputHeight + padWidth); j++) {
             for(i=padWidth; i < (inputWidth + padWidth); i++) {
@@ -376,33 +376,33 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
         for(j=0; j < padWidth; j++) {
             for(i=0; i < (inputWidth + 2*padWidth); i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
 
         for(j=(padWidth + inputHeight); j < (inputHeight + 2*padWidth); j++) {
             for(i=0; i < (inputWidth + 2*padWidth); i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
 
         for(j=0; j < (2*padWidth + inputHeight); j++) {
             for(i=0; i < padWidth; i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
 
         for(j=0; j < (2*padWidth + inputHeight); j++) {
             for(i=(padWidth + inputWidth); i < (inputWidth + 2*padWidth); i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
     } else if (ptype == VERTICAL) {
-        pitchInputGrayscale = ALIGN_TO_FOUR(inputWidth);
-        pitchOutputGrayscale = ALIGN_TO_FOUR(inputWidth);
+        pitchInputGrayscale = inputWidth;
+        pitchOutputGrayscale = inputWidth;
 
         for(j=padWidth; j < (inputHeight + padWidth); j++) {
             for(i=0; i < inputWidth; i++) {
@@ -415,19 +415,19 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
         for(j=0; j < padWidth; j++) {
             for(i=0; i < inputWidth; i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
 
         for(j=(padWidth + inputHeight); j < (inputHeight + 2*padWidth); j++) {
             for(i=0; i < inputWidth; i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
     } else if (ptype == HORIZONTAL) {
-        pitchInputGrayscale = ALIGN_TO_FOUR(inputWidth);
-        pitchOutputGrayscale = ALIGN_TO_FOUR(inputWidth + 2*padWidth);
+        pitchInputGrayscale = inputWidth;
+        pitchOutputGrayscale = inputWidth + 2*padWidth;
 
         for(j=0; j < inputHeight; j++) {
             for(i=padWidth; i < (inputWidth + padWidth); i++) {
@@ -440,14 +440,14 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
         for(j=0; j < inputHeight; j++) {
             for(i=0; i < padWidth; i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
 
         for(j=0; j < inputHeight; j++) {
             for(i=(padWidth + inputWidth); i < (inputWidth + 2*padWidth); i++) {
                 pMovOutputGrayscale = outputGrayscale + j*pitchOutputGrayscale + i;
-                *pMovOutputGrayscale = (unsigned char)0;
+                *pMovOutputGrayscale = 0.0;
             }
         }
     }
@@ -455,26 +455,29 @@ int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int input
     return 0;
 }
 
-int convolve2D(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
+int convolve2D(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, double* outputGrayscale)
 {
     unsigned int padWidth;
     unsigned int i, j, k, l;
     unsigned int pitchPaddedGrayscale, pitchOutputGrayscale;
     double result;
 
-    unsigned char* paddedGrayscale;
-    unsigned char* pMovPaddedGrayscale;
-    unsigned char* pMovOutputGrayscale;
+    double* double_input_grayscale;
+    double* paddedGrayscale;
+    double* pMovPaddedGrayscale;
+    double* pMovOutputGrayscale;
     double* pMovKernel;
 
     padWidth = (kernelSize - 1) / 2;
 
-    paddedGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*padWidth)*(height + 2*padWidth)));
+    double_input_grayscale = (double*)malloc(width*height*sizeof(double));
+    paddedGrayscale = (double*)malloc(((width + 2*padWidth)*(height + 2*padWidth)) * sizeof(double));
 
-    makeZeroPaddedImage(inputGrayscale, width, height, padWidth, paddedGrayscale, VERTICAL_AND_HORIZONTAL);
+    convertUcharToDoubleGrayscale(inputGrayscale, width, height, double_input_grayscale);
+    makeZeroPaddedImage(double_input_grayscale, width, height, padWidth, paddedGrayscale, VERTICAL_AND_HORIZONTAL);
 
-    pitchPaddedGrayscale = ALIGN_TO_FOUR(width + 2*padWidth);
-    pitchOutputGrayscale = ALIGN_TO_FOUR(width);
+    pitchPaddedGrayscale = width + 2*padWidth;
+    pitchOutputGrayscale = width;
 
     for(j=padWidth; j < (padWidth + height); j++) {
         for(i=padWidth; i < (padWidth + width); i++) {
@@ -485,42 +488,43 @@ int convolve2D(double* kernel, int kernelSize, unsigned char* inputGrayscale, in
                 for(l=0; l < kernelSize; l++) {
                     pMovKernel = kernel + (kernelSize - k - 1)*kernelSize + (kernelSize - l - 1);
                     pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*pitchPaddedGrayscale + (i - padWidth + l);
-                    result = result + (*pMovKernel) * (double)(*pMovPaddedGrayscale);
+                    result = result + (*pMovKernel) * (*pMovPaddedGrayscale);
                 }
             }
 
             if (result > 255) result = 255;
             else if (result < 0) result = 0;
 
-            *pMovOutputGrayscale = (unsigned char)result;
+            *pMovOutputGrayscale = result;
         }
     }
 
     free(paddedGrayscale);
+    free(double_input_grayscale);
 
     return 0;
 }
 
-int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir)
+int convolve2Dwith1Dkernel(double* kernel, int kernelSize, double* inputGrayscale, int width, int height, double* outputGrayscale, enum direction dir)
 {
     unsigned int padWidth;
     unsigned int i, j, k;
     unsigned int pitchPaddedGrayscale, pitchOutputGrayscale;
     double result;
 
-    unsigned char* paddedGrayscale;
-    unsigned char* pMovPaddedGrayscale;
-    unsigned char* pMovOutputGrayscale;
+    double* paddedGrayscale;
+    double* pMovPaddedGrayscale;
+    double* pMovOutputGrayscale;
     double* pMovKernel;
 
     padWidth = (kernelSize - 1) / 2;
 
     if (dir == VERTICAL) {
-        paddedGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width)*(height + 2*padWidth)));
+        paddedGrayscale = (double*)malloc(width*(height + 2*padWidth)*sizeof(double));
         makeZeroPaddedImage(inputGrayscale, width, height, padWidth, paddedGrayscale, VERTICAL);
 
-        pitchPaddedGrayscale = ALIGN_TO_FOUR(width);
-        pitchOutputGrayscale = ALIGN_TO_FOUR(width);
+        pitchPaddedGrayscale = width;
+        pitchOutputGrayscale = width;
 
         for(j=padWidth; j < (padWidth + height); j++) {
             for(i=0; i < width; i++) {
@@ -530,13 +534,10 @@ int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputG
                 for(k=0; k < kernelSize; k++) {
                     pMovKernel = kernel + (kernelSize - k - 1);
                     pMovPaddedGrayscale = paddedGrayscale + (j - padWidth + k)*pitchPaddedGrayscale + i;
-                    result = result + (*pMovKernel) * (double)(*pMovPaddedGrayscale);
+                    result = result + (*pMovKernel) * (*pMovPaddedGrayscale);
                 }
 
-                if (result > 255) result = 255;
-                else if (result < 0) result = 0;
-
-                *pMovOutputGrayscale = (unsigned char)result;
+                *pMovOutputGrayscale = result;
             }
         }
 
@@ -545,11 +546,11 @@ int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputG
         return 0;
 
     } else if (dir == HORIZONTAL) {
-        paddedGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*padWidth)*height));
+        paddedGrayscale = (double*)malloc((width + 2*padWidth)*height*sizeof(double));
         makeZeroPaddedImage(inputGrayscale, width, height, padWidth, paddedGrayscale, HORIZONTAL);
 
-        pitchPaddedGrayscale = ALIGN_TO_FOUR(width + 2*padWidth);
-        pitchOutputGrayscale = ALIGN_TO_FOUR(width);
+        pitchPaddedGrayscale = width + 2*padWidth;
+        pitchOutputGrayscale = width;
 
         for(j=0; j < height; j++) {
             for(i=padWidth; i < (padWidth + width); i++) {
@@ -559,13 +560,10 @@ int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputG
                 for(k=0; k < kernelSize; k++) {
                     pMovKernel = kernel + (kernelSize - k - 1);
                     pMovPaddedGrayscale = paddedGrayscale + j*pitchPaddedGrayscale + (i - padWidth + k);
-                    result = result + (*pMovKernel) * (double)(*pMovPaddedGrayscale);
+                    result = result + (*pMovKernel) * (*pMovPaddedGrayscale);
                 }
 
-                if (result > 255) result = 255;
-                else if (result < 0) result = 0;
-
-                *pMovOutputGrayscale = (unsigned char)result;
+                *pMovOutputGrayscale = result;
             }
         }
 
@@ -579,13 +577,20 @@ int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputG
 
 int UniformBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
 {
+    double* intermediateGrayscale;
+
     double kernel[9] =  {
         1/9.0, 1/9.0, 1/9.0,
         1/9.0, 1/9.0, 1/9.0,
         1/9.0, 1/9.0, 1/9.0
     };
 
-    convolve2D(kernel, 3, inputGrayscale, width, height, outputGrayscale);
+    intermediateGrayscale = (double *)malloc(width*height*sizeof(double));
+
+    convolve2D(kernel, 3, inputGrayscale, width, height, intermediateGrayscale);
+    convertDoubleToUcharGrayscale(intermediateGrayscale, width, height, outputGrayscale);
+
+    free(intermediateGrayscale);
 
     return 0;
 }
@@ -662,18 +667,18 @@ void getGaussianKernel2D(double* kernel, double sigma, int kernelSize)
     }
 }
 
-int GaussianDerivativeX(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+int GaussianDerivativeX(double* input_grayscale, int width, int height, double* output_grayscale, double sigma)
 {
     double* kernel_x;
     double* kernel_y;
     int kernel_size;
-    unsigned char* temp_grayscale_v;
+    double* temp_grayscale_v;
 
-    kernel_size = 2 * ((int) (3*sigma)) + 1;
+    kernel_size = 2 * ((int) (5*sigma)) + 1;
 
-    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
-    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    temp_grayscale_v = (double*)malloc(width * height * sizeof(double));
+    kernel_x = (double *)malloc(kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * sizeof(double));
 
     getDGausianKernel1D(kernel_x, sigma, kernel_size);
     getGaussianKernel1D(kernel_y, sigma, kernel_size);
@@ -681,21 +686,25 @@ int GaussianDerivativeX(unsigned char* input_grayscale, int width, int height, u
     convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
     convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
 
+    free(temp_grayscale_v);
+    free(kernel_x);
+    free(kernel_y);
+
     return 0;
 }
 
-int GaussianDerivativeY(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+int GaussianDerivativeY(double* input_grayscale, int width, int height, double* output_grayscale, double sigma)
 {
     double* kernel_x;
     double* kernel_y;
     int kernel_size;
-    unsigned char* temp_grayscale_v;
+    double* temp_grayscale_v;
 
-    kernel_size = 2 * ((int) (3*sigma)) + 1;
+    kernel_size = 2 * ((int) (5*sigma)) + 1;
 
-    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
-    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    temp_grayscale_v = (double*)malloc(width * height * sizeof(double));
+    kernel_x = (double *)malloc(kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * sizeof(double));
 
     getDGausianKernel1D(kernel_y, sigma, kernel_size);
     getGaussianKernel1D(kernel_x, sigma, kernel_size);
@@ -703,21 +712,25 @@ int GaussianDerivativeY(unsigned char* input_grayscale, int width, int height, u
     convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
     convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
 
+    free(temp_grayscale_v);
+    free(kernel_x);
+    free(kernel_y);
+
     return 0;
 }
 
-int GaussianDerivativeXX(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+int GaussianDerivativeXX(double* input_grayscale, int width, int height, double* output_grayscale, double sigma)
 {
     double* kernel_x;
     double* kernel_y;
     int kernel_size;
-    unsigned char* temp_grayscale_v;
+    double* temp_grayscale_v;
 
-    kernel_size = 2 * ((int) (3*sigma)) + 1;
+    kernel_size = 2 * ((int) (5*sigma)) + 1;
 
-    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
-    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    temp_grayscale_v = (double*)malloc(width * height * sizeof(double));
+    kernel_x = (double *)malloc(kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * sizeof(double));
 
     getD2GausianKernel1D(kernel_x, sigma, kernel_size);
     getGaussianKernel1D(kernel_y, sigma, kernel_size);
@@ -725,21 +738,25 @@ int GaussianDerivativeXX(unsigned char* input_grayscale, int width, int height, 
     convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
     convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
 
+    free(temp_grayscale_v);
+    free(kernel_x);
+    free(kernel_y);
+
     return 0;
 }
 
-int GaussianDerivativeYY(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+int GaussianDerivativeYY(double* input_grayscale, int width, int height, double* output_grayscale, double sigma)
 {
     double* kernel_x;
     double* kernel_y;
     int kernel_size;
-    unsigned char* temp_grayscale_v;
+    double* temp_grayscale_v;
 
-    kernel_size = 2 * ((int) (3*sigma)) + 1;
+    kernel_size = 2 * ((int) (5*sigma)) + 1;
 
-    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
-    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    temp_grayscale_v = (double*)malloc(width * height * sizeof(double));
+    kernel_x = (double *)malloc(kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * sizeof(double));
 
     getD2GausianKernel1D(kernel_y, sigma, kernel_size);
     getGaussianKernel1D(kernel_x, sigma, kernel_size);
@@ -747,21 +764,25 @@ int GaussianDerivativeYY(unsigned char* input_grayscale, int width, int height, 
     convolve2Dwith1Dkernel(kernel_y, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
     convolve2Dwith1Dkernel(kernel_x, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
 
+    free(temp_grayscale_v);
+    free(kernel_x);
+    free(kernel_y);
+
     return 0;
 }
 
-int GaussianDerivativeXY(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma)
+int GaussianDerivativeXY(double* input_grayscale, int width, int height, double* output_grayscale, double sigma)
 {
     double* kernel_x;
     double* kernel_y;
     int kernel_size;
-    unsigned char* temp_grayscale_v;
+    double* temp_grayscale_v;
 
-    kernel_size = 2 * ((int) (3*sigma)) + 1;
+    kernel_size = 2 * ((int) (5*sigma)) + 1;
 
-    temp_grayscale_v = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    kernel_x = (double *)malloc(kernel_size * kernel_size * sizeof(double));
-    kernel_y = (double *)malloc(kernel_size * kernel_size * sizeof(double));
+    temp_grayscale_v = (double*)malloc(width * height * sizeof(double));
+    kernel_x = (double *)malloc(kernel_size * sizeof(double));
+    kernel_y = (double *)malloc(kernel_size * sizeof(double));
 
     getGaussianKernel1D(kernel_x, sigma, kernel_size);
     getGaussianKernel1D(kernel_y, sigma, kernel_size);
@@ -769,87 +790,323 @@ int GaussianDerivativeXY(unsigned char* input_grayscale, int width, int height, 
     convolve2Dwith1Dkernel(kernel_x, kernel_size, input_grayscale, width, height, temp_grayscale_v, VERTICAL);
     convolve2Dwith1Dkernel(kernel_y, kernel_size, temp_grayscale_v, width, height, output_grayscale, HORIZONTAL);
 
+    free(temp_grayscale_v);
+    free(kernel_x);
+    free(kernel_y);
+
     return 0;
 }
 
 int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma)
 {
     double* kernel;
+    double* intermediateGrayscale;
     int kernelSize;
 
     kernelSize = 2 * ((int) (3*sigma)) + 1;
 
     kernel = (double *)malloc(kernelSize * kernelSize * sizeof(double));
+    intermediateGrayscale = (double *)malloc(width*height*sizeof(double));
 
     getGaussianKernel2D(kernel, sigma, kernelSize);
 
-    convolve2D(kernel, kernelSize, inputGrayscale, width, height, outputGrayscale);
+    convolve2D(kernel, kernelSize, inputGrayscale, width, height, intermediateGrayscale);
+    convertDoubleToUcharGrayscale(intermediateGrayscale, width, height, outputGrayscale);
 
     free(kernel);
+    free(intermediateGrayscale);
 
     return 0;
 }
 
+
+int zero_crossing_patch(double* pixel_values, int length)
+{
+    int num_zero_or_positive = 0;
+    int num_zero_or_negative = 0;
+
+    for(int i=0; i < length; i++) {
+        if (pixel_values[i] <= 0)
+            num_zero_or_negative++;
+        if (0 <= pixel_values[i])
+            num_zero_or_positive++;
+    }
+
+    if (num_zero_or_positive > 0 && num_zero_or_negative > 0)
+        return 1;
+
+    return 0;
+}
+
+
 int DifferentialEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold)
 {
-    unsigned int i, j, pitch;
-    unsigned char* input_grayscale_DX;
-    unsigned char* input_grayscale_DXX;
-    unsigned char* input_grayscale_DY;
-    unsigned char* input_grayscale_DYY;
-    unsigned char* input_grayscale_DXY;
-    unsigned char* p_DX;
-    unsigned char* p_DXX;
-    unsigned char* p_DY;
-    unsigned char* p_DYY;
-    unsigned char* p_DXY;
+    unsigned int i, j, pitch, nedges;
+    double* double_input_grayscale;
+    double* input_grayscale_DX;
+    double* input_grayscale_DXX;
+    double* input_grayscale_DY;
+    double* input_grayscale_DYY;
+    double* input_grayscale_DXY;
+    double* p_DX;
+    double* p_DXX;
+    double* p_DY;
+    double* p_DYY;
+    double* p_DXY;
+    double* gradient_norm;
+    double** hedges;
     unsigned char* p_output;
-    double norm_squared_gradient, magnitude_second_order_directional_derivative, squared_threshold;
+    double* p_gradient_norm;
+    double* p_second_order;
+    double norm_squared_gradient, squared_threshold, squared_cutoff_threshold;
+    double* second_order;
 
-    input_grayscale_DX = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    input_grayscale_DXX = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    input_grayscale_DY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    input_grayscale_DYY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    input_grayscale_DXY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    double_input_grayscale = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DX = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DXX = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DY = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DYY = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DXY = (double*)malloc(width * height * sizeof(double));
+    gradient_norm = (double*)malloc(width * height * sizeof(double));
+    second_order = (double*)malloc(width * height * sizeof(double));
+    hedges = (double**)malloc(width * height * sizeof(double**));
 
-    GaussianDerivativeX(input_grayscale, width, height, input_grayscale_DX, sigma);
-    GaussianDerivativeXX(input_grayscale, width, height, input_grayscale_DXX, sigma);
-    GaussianDerivativeY(input_grayscale, width, height, input_grayscale_DY, sigma);
-    GaussianDerivativeYY(input_grayscale, width, height, input_grayscale_DYY, sigma);
-    GaussianDerivativeXY(input_grayscale, width, height, input_grayscale_DXY, sigma);
+    convertUcharToDoubleGrayscale(input_grayscale, width, height, double_input_grayscale);
+    GaussianDerivativeX(double_input_grayscale, width, height, input_grayscale_DX, sigma);
+    GaussianDerivativeXX(double_input_grayscale, width, height, input_grayscale_DXX, sigma);
+    GaussianDerivativeY(double_input_grayscale, width, height, input_grayscale_DY, sigma);
+    GaussianDerivativeYY(double_input_grayscale, width, height, input_grayscale_DYY, sigma);
+    GaussianDerivativeXY(double_input_grayscale, width, height, input_grayscale_DXY, sigma);
 
     squared_threshold = threshold * threshold;
+    squared_cutoff_threshold = cutoff_threshold * cutoff_threshold;
 
     pitch = ALIGN_TO_FOUR(width);
 
     for(j=0; j < height; j++) {
-        for(i=0; i < width; i++) {
-            p_DX = input_grayscale_DX + pitch * j + i;
-            p_DXX = input_grayscale_DXX + pitch * j + i;
-            p_DY = input_grayscale_DY + pitch * j + i;
-            p_DYY = input_grayscale_DYY + pitch * j + i;
-            p_DXY = input_grayscale_DXY + pitch * j + i;
-            p_output = output_grayscale + pitch * j + i;
+        for (i=0; i < width; i++) {
+            p_DX = input_grayscale_DX + width*j + i;
+            p_DXX = input_grayscale_DXX + width*j + i;
+            p_DY = input_grayscale_DY + width*j + i;
+            p_DYY = input_grayscale_DYY + width*j + i;
+            p_DXY = input_grayscale_DXY + width*j + i;
+            p_second_order = second_order + width * j + i;
+
+            *p_second_order = ((*p_DX) * (*p_DX) * (*p_DXX)) + (2 * (*p_DX) * (*p_DY) * (*p_DXY)) + ((*p_DY) * (*p_DY) * (*p_DYY));
+        }
+    }
+
+    for(j=1; j < (height - 1); j++) {
+        for(i=1; i < (width - 1); i++) {
+            p_DX = input_grayscale_DX + width*j + i;
+            p_DY = input_grayscale_DY + width*j + i;
+            p_gradient_norm = gradient_norm + width * j + i;
+            p_second_order = second_order + width*j + i;
 
             norm_squared_gradient = (*p_DX) * (*p_DX) + (*p_DY) * (*p_DY);
 
-            *p_output = 0;
+            double nbr_seo[8];
+            nbr_seo[0] = *(p_second_order + (j + 1)*width + i);
+            nbr_seo[1] = *(p_second_order + (j - 1)*width + i);
+            nbr_seo[2] = *(p_second_order + j*width + (i + 1));
+            nbr_seo[3] = *(p_second_order + j*width + (i - 1));
+            nbr_seo[4] = *(p_second_order + (j + 1)*width + (i + 1));
+            nbr_seo[5] = *(p_second_order + (j - 1)*width + (i - 1));
+            nbr_seo[6] = *(p_second_order + (j + 1)*width + (i - 1));
+            nbr_seo[7] = *(p_second_order + (j - 1)*width + (i + 1));
 
-            if (norm_squared_gradient >= squared_threshold) {
-                magnitude_second_order_directional_derivative = abs((*p_DX) * (*p_DX) * (*p_DXX) + 2*(*p_DX) * (*p_DY) * (*p_DXY) + (*p_DY) * (*p_DY) * (*p_DYY));
+            if ((norm_squared_gradient >= squared_threshold) && (zero_crossing_patch(nbr_seo, 8))) {
+                *p_gradient_norm = norm_squared_gradient;
+            }
+            else {
+                *p_gradient_norm = 0.0;
+            }
 
-                if ((magnitude_second_order_directional_derivative < 1e-6) && (norm_squared_gradient) >= cutoff_threshold) {
-                    *p_output = norm_squared_gradient;
-                }
+        }
+    }
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_gradient_norm = gradient_norm + width * j + i;
+
+            if (*p_gradient_norm >= squared_threshold) {
+                hedges[0] = p_gradient_norm;
+                nedges = 1;
+
+                do {
+                    nedges--;
+                    double* nbrs[8];
+                    nbrs[0] = hedges[nedges] + width;
+                    nbrs[1] = hedges[nedges] - width;
+                    nbrs[2] = hedges[nedges] - 1;
+                    nbrs[3] = hedges[nedges] + 1;
+                    nbrs[4] = hedges[nedges] + width + 1;
+                    nbrs[5] = hedges[nedges] + width - 1;
+                    nbrs[6] = hedges[nedges] - width + 1;
+                    nbrs[7] = hedges[nedges] - width - 1;
+                    for (int k=0; k < 8; k++) {
+                        if ((*(nbrs[k]) >= squared_cutoff_threshold) && (*(nbrs[k]) < squared_threshold)) {
+                            *(nbrs[k]) = squared_threshold;
+                            nedges++;
+                            hedges[nedges] = nbrs[k];
+                        }
+                    }
+
+                } while(nedges > 0);
             }
         }
     }
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_gradient_norm = gradient_norm + width * j + i;
+            p_output = output_grayscale + pitch * j + i;
+
+            *p_output = 0;
+            if(*p_gradient_norm >= squared_threshold) {
+                *p_output = 255;
+            }
+        }
+    }
+
 
     free(input_grayscale_DX);
     free(input_grayscale_DXX);
     free(input_grayscale_DY);
     free(input_grayscale_DYY);
     free(input_grayscale_DXY);
+    free(double_input_grayscale);
+    free(gradient_norm);
+    free(second_order);
+    free(hedges);
+
+    return 0;
+}
+
+
+int CannyEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold)
+{
+    unsigned int i, j, pitch, nedges;
+    double* double_input_grayscale;
+    double* input_grayscale_DX;
+    double* input_grayscale_DXX;
+    double* input_grayscale_DY;
+    double* input_grayscale_DYY;
+    double* input_grayscale_DXY;
+    double* p_DX;
+    double* p_DY;
+    double* gradient_norm;
+    double** hedges;
+    unsigned char* p_output;
+    double* p_gradient_norm;
+    double norm_squared_gradient, squared_threshold, squared_cutoff_threshold;
+    double n_norm_squared_gradient, s_norm_squared_gradient, e_norm_squared_gradient, w_norm_squared_gradient, ne_norm_squared_gradient,
+           nw_norm_squared_gradient, se_norm_squared_gradient, sw_norm_squared_gradient, dir;
+
+    double_input_grayscale = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DX = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DXX = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DY = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DYY = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DXY = (double*)malloc(width * height * sizeof(double));
+    gradient_norm = (double*)malloc(width * height * sizeof(double));
+    hedges = (double**)malloc(width * height * sizeof(double**));
+
+    convertUcharToDoubleGrayscale(input_grayscale, width, height, double_input_grayscale);
+    GaussianDerivativeX(double_input_grayscale, width, height, input_grayscale_DX, sigma);
+    GaussianDerivativeXX(double_input_grayscale, width, height, input_grayscale_DXX, sigma);
+    GaussianDerivativeY(double_input_grayscale, width, height, input_grayscale_DY, sigma);
+    GaussianDerivativeYY(double_input_grayscale, width, height, input_grayscale_DYY, sigma);
+    GaussianDerivativeXY(double_input_grayscale, width, height, input_grayscale_DXY, sigma);
+
+    squared_threshold = threshold * threshold;
+    squared_cutoff_threshold = cutoff_threshold * cutoff_threshold;
+
+    pitch = ALIGN_TO_FOUR(width);
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_DX = input_grayscale_DX + width*j + i;
+            p_DY = input_grayscale_DY + width*j + i;
+            p_gradient_norm = gradient_norm + width * j + i;
+
+            norm_squared_gradient = (*p_DX) * (*p_DX) + (*p_DY) * (*p_DY);
+            n_norm_squared_gradient = ((*(p_DX + width)) * (*(p_DX + width))) + ((*(p_DY + width)) * (*(p_DY + width)));
+            s_norm_squared_gradient = ((*(p_DX - width)) * (*(p_DX - width))) + ((*(p_DY - width)) * (*(p_DY - width)));
+            e_norm_squared_gradient = ((*(p_DX - 1)) * (*(p_DX - 1))) + ((*(p_DY - 1)) * (*(p_DY - 1)));
+            w_norm_squared_gradient = ((*(p_DX + 1)) * (*(p_DX + 1))) + ((*(p_DY + 1)) * (*(p_DY + 1)));
+            ne_norm_squared_gradient = ((*(p_DX + width + 1)) * (*(p_DX + width + 1))) + ((*(p_DY + width + 1)) * (*(p_DY + width + 1)));
+            nw_norm_squared_gradient = ((*(p_DX + width - 1)) * (*(p_DX + width - 1))) + ((*(p_DY + width - 1)) * (*(p_DY + width - 1)));
+            se_norm_squared_gradient = ((*(p_DX - width + 1)) * (*(p_DX - width + 1))) + ((*(p_DY - width + 1)) * (*(p_DY - width + 1)));
+            sw_norm_squared_gradient = ((*(p_DX - width - 1)) * (*(p_DX - width - 1))) + ((*(p_DY - width - 1)) * (*(p_DY - width - 1)));
+
+            dir = (fmod(atan2(*p_DY, *p_DX) + M_PI, M_PI) / M_PI) * 8;
+            if (((dir <= 1 || dir > 7) && ((norm_squared_gradient > e_norm_squared_gradient) && (norm_squared_gradient > w_norm_squared_gradient))) ||
+                ((dir > 1 && dir <= 3) && ((norm_squared_gradient > nw_norm_squared_gradient) && (norm_squared_gradient > se_norm_squared_gradient))) ||
+                ((dir > 3 && dir <= 5) && ((norm_squared_gradient > n_norm_squared_gradient) && (norm_squared_gradient > s_norm_squared_gradient))) ||
+                ((dir > 5 && dir <= 7) && ((norm_squared_gradient > ne_norm_squared_gradient) && (norm_squared_gradient > sw_norm_squared_gradient)))) {
+                *p_gradient_norm = norm_squared_gradient;
+            }
+            else {
+                *p_gradient_norm = 0.0;
+            }
+
+        }
+    }
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_gradient_norm = gradient_norm + width * j + i;
+
+            if (*p_gradient_norm >= squared_threshold) {
+                hedges[0] = p_gradient_norm;
+                nedges = 1;
+
+                do {
+                    nedges--;
+                    double* nbrs[8];
+                    nbrs[0] = hedges[nedges] + width;
+                    nbrs[1] = hedges[nedges] - width;
+                    nbrs[2] = hedges[nedges] - 1;
+                    nbrs[3] = hedges[nedges] + 1;
+                    nbrs[4] = hedges[nedges] + width + 1;
+                    nbrs[5] = hedges[nedges] + width - 1;
+                    nbrs[6] = hedges[nedges] - width + 1;
+                    nbrs[7] = hedges[nedges] - width - 1;
+                    for (int k=0; k < 8; k++) {
+                        if ((*(nbrs[k]) >= squared_cutoff_threshold) && (*(nbrs[k]) < squared_threshold)) {
+                            *(nbrs[k]) = squared_threshold;
+                            nedges++;
+                            hedges[nedges] = nbrs[k];
+                        }
+                    }
+
+                } while(nedges > 0);
+            }
+        }
+    }
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            p_gradient_norm = gradient_norm + width * j + i;
+            p_output = output_grayscale + pitch * j + i;
+
+            *p_output = 0;
+            if(*p_gradient_norm >= squared_threshold) {
+                *p_output = 255;
+            }
+        }
+    }
+
+
+    free(input_grayscale_DX);
+    free(input_grayscale_DXX);
+    free(input_grayscale_DY);
+    free(input_grayscale_DYY);
+    free(input_grayscale_DXY);
+    free(double_input_grayscale);
+    free(gradient_norm);
+    free(hedges);
 
     return 0;
 }
@@ -857,38 +1114,44 @@ int DifferentialEdgeDetector(unsigned char* input_grayscale, int width, int heig
 int CornerDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double sigma_w, double k, double threshold)
 {
     unsigned int i, j, pitch;
-    unsigned char* input_grayscale_DX_squared;
-    unsigned char* input_grayscale_DY_squared;
-    unsigned char* input_grayscale_DXDY;
-    unsigned char* s_x2;
-    unsigned char* s_y2;
-    unsigned char* s_xy;
-    unsigned char* p_DX_squared;
-    unsigned char* p_DY_squared;
-    unsigned char* p_DXDY;
-    unsigned char* p_sx2;
-    unsigned char* p_sy2;
-    unsigned char* p_sxy;
+    double* double_input_grayscale;
+    double* input_grayscale_DX_squared;
+    double* input_grayscale_DY_squared;
+    double* input_grayscale_DXDY;
+    double* s_x2;
+    double* s_y2;
+    double* s_xy;
+    double* p_DX_squared;
+    double* p_DY_squared;
+    double* p_DXDY;
+    double* p_sx2;
+    double* p_sy2;
+    double* p_sxy;
     unsigned char* p_output;
     double harris_corner_response;
+    double* harris_corner_response_image;
+    double* p_harris_corner_response_image;
 
-    input_grayscale_DX_squared = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    input_grayscale_DY_squared = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    input_grayscale_DXDY = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    s_x2 = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    s_y2 = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
-    s_xy = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    harris_corner_response_image = (double*)malloc(width*height*sizeof(double));
+    double_input_grayscale = (double*)malloc(width*height*sizeof(double));
+    input_grayscale_DX_squared = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DY_squared = (double*)malloc(width * height * sizeof(double));
+    input_grayscale_DXDY = (double*)malloc(width * height * sizeof(double));
+    s_x2 = (double*)malloc(width * height * sizeof(double));
+    s_y2 = (double*)malloc(width * height * sizeof(double));
+    s_xy = (double*)malloc(width * height * sizeof(double));
 
-    GaussianDerivativeX(input_grayscale, width, height, input_grayscale_DX_squared, sigma);
-    GaussianDerivativeY(input_grayscale, width, height, input_grayscale_DY_squared, sigma);
+    convertUcharToDoubleGrayscale(input_grayscale, width, height, double_input_grayscale);
+    GaussianDerivativeX(double_input_grayscale, width, height, input_grayscale_DX_squared, sigma);
+    GaussianDerivativeY(double_input_grayscale, width, height, input_grayscale_DY_squared, sigma);
 
     pitch = ALIGN_TO_FOUR(width);
 
     for(j=0; j < height; j++) {
         for(i=0; i < width; i++) {
-            p_DX_squared = input_grayscale_DX_squared + pitch * j + i;
-            p_DY_squared = input_grayscale_DY_squared + pitch * j + i;
-            p_DXDY = input_grayscale_DXDY + pitch * j + i;
+            p_DX_squared = input_grayscale_DX_squared + width * j + i;
+            p_DY_squared = input_grayscale_DY_squared + width * j + i;
+            p_DXDY = input_grayscale_DXDY + width * j + i;
 
             *p_DXDY = (*p_DX_squared) * (*p_DX_squared);
             *p_DX_squared = (*p_DX_squared) * (*p_DX_squared);
@@ -896,23 +1159,47 @@ int CornerDetector(unsigned char* input_grayscale, int width, int height, unsign
         }
     }
 
-    GaussianBlur(input_grayscale_DX_squared, width, height, s_x2, sigma_w);
-    GaussianBlur(input_grayscale_DY_squared, width, height, s_y2, sigma_w);
-    GaussianBlur(input_grayscale_DXDY, width, height, s_xy, sigma_w);
+    GaussianWindow(input_grayscale_DX_squared, width, height, s_x2, sigma_w);
+    GaussianWindow(input_grayscale_DY_squared, width, height, s_y2, sigma_w);
+    GaussianWindow(input_grayscale_DXDY, width, height, s_xy, sigma_w);
 
     for(j=0; j < height; j++) {
         for(i=0; i < width; i++) {
-            p_sx2 = s_x2 + pitch * j + i;
-            p_sy2 = s_y2 + pitch * j + i;
-            p_sxy = s_xy + pitch * j + i;
-            p_output = output_grayscale + pitch * j + i;
+            p_sx2 = s_x2 + width * j + i;
+            p_sy2 = s_y2 + width * j + i;
+            p_sxy = s_xy + width * j + i;
+            p_harris_corner_response_image = harris_corner_response_image + width * j + i;
 
             harris_corner_response = (((*p_sx2) * (*p_sy2)) - ((*p_sxy) * (*p_sxy))) - k * ((*p_sx2)  + (*p_sy2)) * ((*p_sx2)  + (*p_sy2));
 
-            *p_output = 0;
+            *p_harris_corner_response_image = 0;
 
             if (harris_corner_response > threshold) {
+                *p_harris_corner_response_image = harris_corner_response;
+            }
+        }
+    }
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            double* nbrs[8];
+            p_harris_corner_response_image = harris_corner_response_image + width * j + i;
+            p_output = output_grayscale + pitch * j + i;
+            nbrs[0] = p_harris_corner_response_image + width;
+            nbrs[1] = p_harris_corner_response_image - width;
+            nbrs[2] = p_harris_corner_response_image - 1;
+            nbrs[3] = p_harris_corner_response_image + 1;
+            nbrs[4] = p_harris_corner_response_image + width + 1;
+            nbrs[5] = p_harris_corner_response_image + width - 1;
+            nbrs[6] = p_harris_corner_response_image - width + 1;
+            nbrs[7] = p_harris_corner_response_image - width - 1;
+            if((*p_harris_corner_response_image > *nbrs[0]) && (*p_harris_corner_response_image > *nbrs[1]) && (*p_harris_corner_response_image > *nbrs[2]) &&
+                (*p_harris_corner_response_image > *nbrs[3]) && (*p_harris_corner_response_image > *nbrs[4]) && (*p_harris_corner_response_image > *nbrs[5]) &&
+                (*p_harris_corner_response_image > *nbrs[6]) && (*p_harris_corner_response_image > *nbrs[7])) {
                 *p_output = 255;
+            }
+            else {
+                *p_output = 0;
             }
         }
     }
@@ -923,6 +1210,8 @@ int CornerDetector(unsigned char* input_grayscale, int width, int height, unsign
     free(s_x2);
     free(s_y2);
     free(s_xy);
+    free(double_input_grayscale);
+    free(harris_corner_response_image);
 
     return 0;
 }
@@ -931,9 +1220,40 @@ int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned 
 {
     double* kernel;
     int max, kernelSize;
-    unsigned char* tempGrayscaleV;
+    double* doubleInputGrayscale;
+    double* tempGrayscaleV;
+    double* tempGrayscaleH;
 
-    tempGrayscaleV = (unsigned char*)malloc(ALIGN_TO_FOUR(width) * height);
+    doubleInputGrayscale = (double*)malloc(width * height * sizeof(double));
+    tempGrayscaleV = (double*)malloc(width * height * sizeof(double));
+    tempGrayscaleH = (double*)malloc(width * height * sizeof(double));
+
+    max = (int) (3*sigma);
+    kernelSize = 2 * max + 1;
+
+    kernel = (double*)malloc(kernelSize * sizeof(double));
+    getGaussianKernel1D(kernel, sigma, kernelSize);
+
+    convertUcharToDoubleGrayscale(inputGrayscale, width, height, doubleInputGrayscale);
+    convolve2Dwith1Dkernel(kernel, kernelSize, doubleInputGrayscale, width, height, tempGrayscaleV, VERTICAL);
+    convolve2Dwith1Dkernel(kernel, kernelSize, tempGrayscaleV, width, height, tempGrayscaleH, HORIZONTAL);
+    convertDoubleToUcharGrayscale(tempGrayscaleH, width, height, outputGrayscale);
+
+    free(kernel);
+    free(tempGrayscaleV);
+    free(tempGrayscaleH);
+    free(doubleInputGrayscale);
+
+    return 0;
+}
+
+int GaussianWindow(double* inputGrayscale, int width, int height, double* outputGrayscale, double sigma)
+{
+    double* kernel;
+    int max, kernelSize;
+    double* tempGrayscaleV;
+
+    tempGrayscaleV = (double*)malloc(width * height * sizeof(double));
 
     max = (int) (3*sigma);
     kernelSize = 2 * max + 1;
@@ -950,3 +1270,42 @@ int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned 
     return 0;
 }
 
+void convertDoubleToUcharGrayscale(double* inputGrayscale, int width, int height, unsigned char* outputGrayscale)
+{
+    int i, j, pitch;
+    double* pInput;
+    unsigned char* pOutput;
+
+    pitch = ALIGN_TO_FOUR(width);
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            pInput = inputGrayscale + j*width + i;
+            pOutput = outputGrayscale + j*pitch + i;
+            if (*pInput <= 0) {
+                *pOutput = 0;
+            } else if (*pInput >= 255) {
+                *pOutput = 255;
+            } else {
+                *pOutput = (unsigned char)(*pInput);
+            }
+        }
+    }
+}
+
+void convertUcharToDoubleGrayscale(unsigned char* inputGrayscale, int width, int height, double* outputGrayscale)
+{
+    int i, j, pitch;
+    unsigned char* pInput;
+    double* pOutput;
+
+    pitch = ALIGN_TO_FOUR(width);
+
+    for(j=0; j < height; j++) {
+        for(i=0; i < width; i++) {
+            pInput = inputGrayscale + j*pitch + i;
+            pOutput = outputGrayscale + j*width + i;
+            *pOutput = (double)(*pInput);
+        }
+    }
+}

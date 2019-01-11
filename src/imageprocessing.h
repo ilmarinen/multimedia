@@ -48,15 +48,26 @@ int GrayScaleWriter(unsigned char *pGrayscale, int width, int height, char* outp
 int YUYV2RGB24(unsigned char *pYUYV, int width, int height, unsigned char *pRGB24);
 int RGB24toGrayscale(unsigned char *inputRGB24, int width, int height, unsigned char *outputGrayscale);
 int cropRGB24(unsigned char *inputRGB24, int width, int height, int startX, int startY, int endX, int endY, unsigned char* outputRGB24);
-int makeZeroPaddedImage(unsigned char *inputGrayscale, int inputWidth, int inputHeight, int padWidth, unsigned char *outputGrayscale, enum direction ptype);
-int convolve2D(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
-int convolve2Dwith1Dkernel(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, enum direction dir);
+int makeZeroPaddedImage(double *inputGrayscale, int inputWidth, int inputHeight, int padWidth, double *outputGrayscale, enum direction ptype);
+int convolve2D(double* kernel, int kernelSize, unsigned char* inputGrayscale, int width, int height, double* outputGrayscale);
+int convolve2Dwith1Dkernel(double* kernel, int kernelSize, double* inputGrayscale, int width, int height, double* outputGrayscale, enum direction dir);
 int UniformBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
 void getGaussianKernel1D(double* kernel, double sigma, int kernelSize);
 void getGaussianKernel2D(double* kernel, double sigma, int kernelSize);
+void getDGausianKernel1D(double* kernel, double sigma, int kernelSize);
+void getD2GausianKernel1D(double* kernel, double sigma, int kernelSize);
 int GaussianBlur2DKernel(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma);
+int GaussianDerivativeX(double* input_grayscale, int width, int height, double* output_grayscale, double sigma);
+int GaussianDerivativeY(double* input_grayscale, int width, int height, double* output_grayscale, double sigma);
+int GaussianDerivativeXX(double* input_grayscale, int width, int height, double* output_grayscale, double sigma);
+int GaussianDerivativeYY(double* input_grayscale, int width, int height, double* output_grayscale, double sigma);
+int GaussianDerivativeXY(double* input_grayscale, int width, int height, double* output_grayscale, double sigma);
 int GaussianBlur(unsigned char* inputGrayscale, int width, int height, unsigned char* outputGrayscale, double sigma);
+int GaussianWindow(double* inputGrayscale, int width, int height, double* outputGrayscale, double sigma);
 int DifferentialEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold);
+int CannyEdgeDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double threshold, double cutoff_threshold);
 int CornerDetector(unsigned char* input_grayscale, int width, int height, unsigned char* output_grayscale, double sigma, double sigma_w, double k, double threshold);
+void convertDoubleToUcharGrayscale(double* inputGrayscale, int width, int height, unsigned char* outputGrayscale);
+void convertUcharToDoubleGrayscale(unsigned char* inputGrayscale, int width, int height, double* outputGrayscale);
 
 #endif

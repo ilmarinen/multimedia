@@ -41,17 +41,19 @@ void process_image(const void *p, int size, unsigned int width, unsigned int hei
                    int frame_number, crop_window c_window)
 {
     char output_filename[50], output_cropped_filename[50],
-         output_grayscale_filename[50], output_grayscale_padded_filename[50],
+         output_grayscale_filename[50],
          output_blurred_uniform_filename[50], output_blurred_gaussian_filename[50],
-         output_blurred_gaussian2d_filename[50], output_canny_edge_detector_filename[50], output_corner_detector_filename[50];
+         output_blurred_gaussian2d_filename[50], output_differential_edge_detector_filename[50],
+         output_canny_edge_detector_filename[50], output_corner_detector_filename[50];
     unsigned char *pRGB24, *pCroppedRGB24, *pGrayscale, *pGrayscalePadded, *pGrayscaleBlurred, *pGrayscaleBlurredGaussian,
-        *pGrayscaleBlurredGaussian2d, *pCannyEdges, *pCorners;
+        *pGrayscaleBlurredGaussian2d, *pDifferentialEdges, *pCannyEdges, *pCorners;
     pRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*width)*height);
     pGrayscale = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pGrayscalePadded = (unsigned char*)malloc(ALIGN_TO_FOUR(ALIGN_TO_FOUR(width + 2*1)*(height + 2*1)));
     pGrayscaleBlurred = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pGrayscaleBlurredGaussian = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pGrayscaleBlurredGaussian2d = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
+    pDifferentialEdges = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pCannyEdges = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pCorners = (unsigned char*)malloc(ALIGN_TO_FOUR(width)*height);
     pCroppedRGB24 = (unsigned char*)malloc(ALIGN_TO_FOUR(3*(c_window.end_x - c_window.start_x))*(c_window.end_y - c_window.start_y));
@@ -59,27 +61,27 @@ void process_image(const void *p, int size, unsigned int width, unsigned int hei
     sprintf(output_filename, "%s-%d.bmp", output_filestring, frame_number);
     sprintf(output_cropped_filename, "%s-%d-cropped.bmp", output_filestring, frame_number);
     sprintf(output_grayscale_filename, "%s-%d-gray.bmp", output_filestring, frame_number);
-    sprintf(output_grayscale_padded_filename, "%s-%d-gray-padded.bmp", output_filestring, frame_number);
     sprintf(output_blurred_uniform_filename, "%s-%d-gray-blurred-uniform.bmp", output_filestring, frame_number);
     sprintf(output_blurred_gaussian_filename, "%s-%d-gray-blurred-gaussian.bmp", output_filestring, frame_number);
     sprintf(output_blurred_gaussian2d_filename, "%s-%d-gray-blurred-gaussian-2d.bmp", output_filestring, frame_number);
+    sprintf(output_differential_edge_detector_filename, "%s-%d-differential-edges.bmp", output_filestring, frame_number);
     sprintf(output_canny_edge_detector_filename, "%s-%d-canny-edges.bmp", output_filestring, frame_number);
     sprintf(output_corner_detector_filename, "%s-%d-corners.bmp", output_filestring, frame_number);
 
     YUYV2RGB24((unsigned char *)p, width, height, pRGB24);
     RGB24toGrayscale(pRGB24, width, height, pGrayscale);
-    makeZeroPaddedImage(pGrayscale, width, height, 1, pGrayscalePadded, VERTICAL_AND_HORIZONTAL);
     UniformBlur(pGrayscale, width, height, pGrayscaleBlurred);
     GaussianBlur2DKernel(pGrayscale, width, height, pGrayscaleBlurredGaussian2d, 1.0);
     GaussianBlur(pGrayscale, width, height, pGrayscaleBlurredGaussian, 1.0);
-    DifferentialEdgeDetector(pGrayscale, width, height, pCannyEdges, 2.0, 5.0, 10.0);
-    CornerDetector(pGrayscale, width, height, pCorners, 2.0, 2.0, 0.04, 500.0);
+    DifferentialEdgeDetector(pGrayscale, width, height, pDifferentialEdges, 2.0, 10.0, 5.0);
+    CannyEdgeDetector(pGrayscale, width, height, pCannyEdges, 2.0, 10.0, 5.0);
+    CornerDetector(pGrayscale, width, height, pCorners, 2.0, 2.0, 0.06, 1000.0);
 
     GrayScaleWriter(pGrayscale, width, height, output_grayscale_filename);
-    GrayScaleWriter(pGrayscalePadded, (width + 2), (height + 2), output_grayscale_padded_filename);
     GrayScaleWriter(pGrayscaleBlurred, width, height, output_blurred_uniform_filename);
     GrayScaleWriter(pGrayscaleBlurredGaussian, width, height, output_blurred_gaussian_filename);
     GrayScaleWriter(pGrayscaleBlurredGaussian2d, width, height, output_blurred_gaussian2d_filename);
+    GrayScaleWriter(pDifferentialEdges, width, height, output_differential_edge_detector_filename);
     GrayScaleWriter(pCannyEdges, width, height, output_canny_edge_detector_filename);
     GrayScaleWriter(pCorners, width, height, output_corner_detector_filename);
     cropRGB24(pRGB24, width, height, c_window.start_x, c_window.start_y, c_window.end_x, c_window.end_y, pCroppedRGB24);
@@ -92,6 +94,7 @@ void process_image(const void *p, int size, unsigned int width, unsigned int hei
     free(pGrayscaleBlurred);
     free(pGrayscaleBlurredGaussian);
     free(pGrayscaleBlurredGaussian2d);
+    free(pDifferentialEdges);
     free(pCannyEdges);
     free(pCorners);
 
