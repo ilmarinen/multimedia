@@ -6,6 +6,8 @@ default: $(BUILD_DIR)/multimedia pymultimedia
 
 test: $(BUILD_DIR)/test_imageprocessing $(BUILD_DIR)/test_camera test_pymultimedia
 
+test_imageprocessing: $(BUILD_DIR)/test_imageprocessing
+
 test_pymultimedia: setup.py $(SRC_DIR)/pymultimedia.pyx $(SRC_DIR)/camera.c $(SRC_DIR)/imageprocessing.c
 	python3 setup.py build_ext --inplace && rm -f $(SRC_DIR)/pymultimedia.c && PYTHONPATH=. pytest $(SRC_DIR)/tests/test_pymultimedia.py
 
