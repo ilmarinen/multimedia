@@ -1,5 +1,7 @@
 # Linux Multimedia
 
+[![Build Status](https://travis-ci.com/ilmarinen/multimedia.svg?branch=master)](https://travis-ci.com/ilmarinen/multimedia)
+
 ## Environment
 
 1. `python3 -m venv /path/to/new/virtual/environment`

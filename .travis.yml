@@ -1,0 +1,19 @@
+# Let travis know the language it needs to run
+language: python
+
+# Mention the python version in which travis will run the app
+python:
+  - "3.5"
+
+
+# command to install dependencies in the requirements file
+# You can also install the coverage here to avoid it being in the requirements file
+# It is important to avoid things like coverage, pep8 that are not required to run the app
+install:
+  - pip install -r requirements.txt
+  - mkdir build && mkdir include
+  - make
+  
+ # Another command/method to run tests
+script: 
+  - make test_imageprocessing
