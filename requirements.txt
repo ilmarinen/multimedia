@@ -1,4 +1,4 @@
 Cython==0.29
 numpy==1.15.4
-Pillow==6.2.0
+Pillow==9.3.0
 pytest==4.0.1
